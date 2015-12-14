@@ -66,22 +66,35 @@ void Main()
 
 static void ParseGuildMembers(XElement documentRoot, List<GuildMember> members, DateTime checkTime)
 {
-    members.AddRange(documentRoot.XPathSelectElements("//div[@class=\"guild-member\"]/div/div").OfType<XElement>().Select(x => new GuildMember
+    members.AddRange(documentRoot.XPathSelectElements("//div[@class=\"guild-member\"]/div/div").OfType<XElement>().Select(x => new
     {
+        DocumentRoot = x,
         CheckTime = checkTime,
-        Name = x.XPathSelectElement(".//div[@class=\"ubox-name\"]/span/a").Value.Trim(),
         Prestige = (int)GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(0).Value.Trim()),
         CreditsDonated = GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(1).Value.Trim()),
         MaterialsDonated = (int)GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(2).Value.Trim()),
-        ProfileUrl = x.XPathSelectElement(".//div[@class=\"ubox-name\"]/span/a").Attribute("href").Value,
         ImageUrl = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div/a/div/img").Attribute("src").Value,
         IsGod = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div").Attribute("class").Value.Contains("set-godness"),
         IsPremium = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div").Attribute("class").Value.Contains("set-premium"),
-        IsOnline = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div").Attribute("class").Value.Contains("set-ingame")
+        IsOnline = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div").Attribute("class").Value.Contains("set-ingame"),
+        IsBanned = x.XPathSelectElement(".//div[@class=\"ubox-name\"]/*/span[@class=\"crossed-out b-tip\"]") != null
+    })
+    .Select(x => new GuildMember
+    {
+        CheckTime = checkTime,
+        Prestige = x.Prestige,
+        CreditsDonated = x.CreditsDonated,
+        MaterialsDonated = x.MaterialsDonated,
+        ImageUrl = x.ImageUrl[0] == '/' ? "https://eu.portal.sf.my.com" + x.ImageUrl : x.ImageUrl,
+        IsGod = x.IsGod,
+        IsPremium = x.IsPremium,
+        IsOnline = x.IsOnline,
+        IsBanned = x.IsBanned,
+        Name = x.IsBanned ? x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-name\"]/*/span[@class=\"crossed-out b-tip\"]").Value.Trim()
+            : x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-name\"]/span/a").Value.Trim(),
+        ProfileUrl =  x.IsBanned ? x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-title\"]/a").Attribute("href").Value
+            : x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-name\"]/span/a").Attribute("href").Value
     }));
-
-    foreach (var x in members.Where(x => x.ImageUrl[0] == '/'))
-        x.ImageUrl = "https://eu.portal.sf.my.com" + x.ImageUrl;
 }
 
 //this is meant to store everything in uniform prestige format instead of suffix format. Makes life easier during analysis & filtering
@@ -100,6 +113,7 @@ class GuildMember
     public int MaterialsDonated { get; set; }
     public bool IsPremium { get; set; }
     public bool IsOnline { get; set; }
+    public bool IsBanned { get; set; }
     public bool IsGod { get; set; }
     public string ProfileUrl { get; set; }
     public string ImageUrl { get; set; }
