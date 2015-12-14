@@ -1,4 +1,4 @@
-# SkyforgeAelinetScraper
+# Skyforge Aelinet Scraper
 A small linqpad script to scrape Aelinet of EU Skyforge for Pantheon Member statistics
 
 This script was created out of a need to manage member's donations effectively. 
