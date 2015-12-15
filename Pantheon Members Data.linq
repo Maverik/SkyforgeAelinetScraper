@@ -11,13 +11,13 @@ void Main()
 {
 
     //Your username for Alinet portal (this is in email form)
-	const string username = "";
-	//Your password for Aelinet login
-	const string password = "";
-	
-	//you can get this by visiting your pantheon community page in aelinet. It's the last numbers bit in your address bar.
-	//for example for Team Rocket this id is 243083329203608905
-	const string pantheonId = "";
+    const string username = "";
+    //Your password for Aelinet login
+    const string password = "";
+
+    //you can get this by visiting your pantheon community page in aelinet. It's the last numbers bit in your address bar.
+    //for example for Team Rocket this id is 243083329203608905
+    const string pantheonId = "";
 
     if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(pantheonId))
     {
@@ -28,12 +28,11 @@ void Main()
     var browser = new Browser();
     var checkTime = DateTime.Now;
     var members = new List<GuildMember>();
-    var paging = new HashSet<string>();
 
     //Use uk english rules for parsing rather than current machine locale
     CultureInfo.CurrentCulture = CultureInfo.CreateSpecificCulture("en-gb");
 
-    browser.Navigate($"https://eu.portal.sf.my.com/guild/members/{pantheonId}");
+    browser.Navigate($"https://eu.portal.sf.my.com/skyforgenews");
 
     if (browser.Find(ElementType.TextField, FindBy.Id, "login") != null)
     {
@@ -43,8 +42,19 @@ void Main()
         browser.Find(ElementType.Button, FindBy.Value, "log in").Click();
     }
 
-    browser.Navigate($"https://eu.portal.sf.my.com/guild/members/{pantheonId}");
-    ParseGuildMembers(browser.XDocument.Root, members, checkTime);
+    NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.PantheonMember);
+    NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.AcademyMember);
+
+    members.OrderBy(x => x.Name).Dump();
+}
+
+static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> members, Browser browser, DateTime checkTime, MemberType memberType)
+{
+    var paging = new HashSet<string>();
+    var sectionName = memberType == MemberType.PantheonMember ? "members" : "academy";
+    
+    browser.Navigate($"https://eu.portal.sf.my.com/guild/{sectionName}/{pantheonId}");
+    ParseGuildMembers(browser.XDocument.Root, members, checkTime, memberType);
 
     var page = 2;
 
@@ -60,14 +70,12 @@ void Main()
         var json = JsonConvert.DeserializeAnonymousType(browser.CurrentHtml, new { inits = new Object(), zones = new { listZone = "" } });
         browser.SetContent(json.zones.listZone);
 
-        ParseGuildMembers(browser.XDocument.Root, members, checkTime);
+        ParseGuildMembers(browser.XDocument.Root, members, checkTime, memberType);
         page++;
     }
-
-    members.OrderBy(x => x.Name).Dump();
 }
 
-static void ParseGuildMembers(XElement documentRoot, List<GuildMember> members, DateTime checkTime)
+static void ParseGuildMembers(XElement documentRoot, List<GuildMember> members, DateTime checkTime, MemberType memberType)
 {
     members.AddRange(documentRoot.XPathSelectElements("//div[@class=\"guild-member\"]/div/div").OfType<XElement>().Select(x => new
     {
@@ -80,7 +88,7 @@ static void ParseGuildMembers(XElement documentRoot, List<GuildMember> members, 
         IsGod = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div").Attribute("class").Value.Contains("set-godness"),
         IsPremium = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div").Attribute("class").Value.Contains("set-premium"),
         IsOnline = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div").Attribute("class").Value.Contains("set-ingame"),
-        IsBanned = x.XPathSelectElement(".//div[@class=\"ubox-name\"]/*/span[@class=\"crossed-out b-tip\"]") != null
+        IsBanned = x.XPathSelectElement(".//div[@class=\"ubox-name\"]/*/span[@class=\"crossed-out b-tip\"]") != null,
     })
     .Select(x => new GuildMember
     {
@@ -96,7 +104,8 @@ static void ParseGuildMembers(XElement documentRoot, List<GuildMember> members, 
         Name = x.IsBanned ? x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-name\"]/*/span[@class=\"crossed-out b-tip\"]").Value.Trim()
             : x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-name\"]/span/a").Value.Trim(),
         ProfileUrl = x.IsBanned ? x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-title\"]/a").Attribute("href").Value
-            : x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-name\"]/span/a").Attribute("href").Value
+            : x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-name\"]/span/a").Attribute("href").Value,
+        MemberType = memberType
     }));
 }
 
@@ -104,7 +113,7 @@ static void ParseGuildMembers(XElement documentRoot, List<GuildMember> members, 
 static long GetNumberInLong(string buffer)
 {
     var trimmedBuffer = buffer.Trim();
-    
+
     var suffix = trimmedBuffer[trimmedBuffer.Length - 1];
 
     if (char.IsNumber(suffix)) suffix = (char)0;
@@ -136,6 +145,13 @@ class GuildMember
     public bool IsOnline { get; set; }
     public bool IsBanned { get; set; }
     public bool IsGod { get; set; }
+    public MemberType MemberType { get; set; }
     public string ProfileUrl { get; set; }
     public string ImageUrl { get; set; }
+}
+
+enum MemberType
+{
+    PantheonMember,
+    AcademyMember
 }
