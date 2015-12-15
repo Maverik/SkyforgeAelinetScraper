@@ -9,8 +9,8 @@
 
 void Main()
 {
-	
-	//Your username for Alinet portal (this is in email form)
+
+    //Your username for Alinet portal (this is in email form)
 	const string username = "";
 	//Your password for Aelinet login
 	const string password = "";
@@ -19,22 +19,22 @@ void Main()
 	//for example for Team Rocket this id is 243083329203608905
 	const string pantheonId = "";
 
-	if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(pantheonId))
-	{
-		"Please enter all the required form fields above.".Dump("ERROR");
-		return;
-	}
+    if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(pantheonId))
+    {
+        "Please enter all the required form fields above.".Dump("ERROR");
+        return;
+    }
 
     var browser = new Browser();
     var checkTime = DateTime.Now;
     var members = new List<GuildMember>();
     var paging = new HashSet<string>();
 
-	browser.Navigate($"https://eu.portal.sf.my.com/guild/members/{pantheonId}");
+    browser.Navigate($"https://eu.portal.sf.my.com/guild/members/{pantheonId}");
 
     if (browser.Find(ElementType.TextField, FindBy.Id, "login") != null)
     {
-        browser.Find(ElementType.TextField, FindBy.Id, "login").Value =username;
+        browser.Find(ElementType.TextField, FindBy.Id, "login").Value = username;
         browser.Find(ElementType.TextField, FindBy.Id, "password").Value = password;
         browser.Find(ElementType.Checkbox, FindBy.Id, "remember").Checked = true;
         browser.Find(ElementType.Button, FindBy.Value, "log in").Click();
@@ -70,9 +70,9 @@ static void ParseGuildMembers(XElement documentRoot, List<GuildMember> members, 
     {
         DocumentRoot = x,
         CheckTime = checkTime,
-        Prestige = (int)GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(0).Value.Trim()),
-        CreditsDonated = GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(1).Value.Trim()),
-        MaterialsDonated = (int)GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(2).Value.Trim()),
+        Prestige = (int)GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(0).Value),
+        CreditsDonated = GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(1).Value),
+        MaterialsDonated = (int)GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(2).Value),
         ImageUrl = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div/a/div/img").Attribute("src").Value,
         IsGod = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div").Attribute("class").Value.Contains("set-godness"),
         IsPremium = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div").Attribute("class").Value.Contains("set-premium"),
@@ -92,13 +92,31 @@ static void ParseGuildMembers(XElement documentRoot, List<GuildMember> members, 
         IsBanned = x.IsBanned,
         Name = x.IsBanned ? x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-name\"]/*/span[@class=\"crossed-out b-tip\"]").Value.Trim()
             : x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-name\"]/span/a").Value.Trim(),
-        ProfileUrl =  x.IsBanned ? x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-title\"]/a").Attribute("href").Value
+        ProfileUrl = x.IsBanned ? x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-title\"]/a").Attribute("href").Value
             : x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-name\"]/span/a").Attribute("href").Value
     }));
 }
 
 //this is meant to store everything in uniform prestige format instead of suffix format. Makes life easier during analysis & filtering
-static long GetNumberInLong(string number) { return char.IsNumber(number[number.Length-1]) ? long.Parse(number) : (number[number.Length - 1] == 'M' ? (long)(float.Parse(number.Replace("M", ""))*1000000) : (long)(float.Parse(number.Replace("K", "")) * 1000)); }
+static long GetNumberInLong(string buffer)
+{
+    var trimmedBuffer = buffer.Trim();
+    
+    var suffix = trimmedBuffer[trimmedBuffer.Length - 1];
+
+    if (char.IsNumber(suffix)) suffix = (char)0;
+
+    var number = float.Parse(trimmedBuffer.Replace(suffix.ToString(), "").Trim());
+
+    switch (char.ToUpper(suffix))
+    {
+        case 'K': return (long)(number * 1000);
+        case 'M': return (long)(number * 1000000);
+        case (char)0: return (long)(number);
+        default: throw new ArgumentException($"Unexpected number suffix: {suffix}", nameof(buffer));
+    }
+
+}
 
 class GuildMember
 {
