@@ -30,6 +30,9 @@ void Main()
     var members = new List<GuildMember>();
     var paging = new HashSet<string>();
 
+    //Use uk english rules for parsing rather than current machine locale
+    CultureInfo.CurrentCulture = CultureInfo.CreateSpecificCulture("en-gb");
+
     browser.Navigate($"https://eu.portal.sf.my.com/guild/members/{pantheonId}");
 
     if (browser.Find(ElementType.TextField, FindBy.Id, "login") != null)
