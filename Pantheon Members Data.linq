@@ -10,25 +10,36 @@
 void Main()
 {
 
+    //You can either provide login detials below OR use environment variables
+    //SKYFORGE_LOGIN, SKYFORGE_PASSWORD, SKYFORGE_PANTHEONID
+    //to provide them. Login details provided here will override the environrment
+    //details if present.
+
     //Your username for Alinet portal (this is in email form)
-    const string username = "";
+    var username = "";
     //Your password for Aelinet login
-    const string password = "";
+    var password = "";
 
     //you can get this by visiting your pantheon community page in aelinet. It's the last numbers bit in your address bar.
     //for example for Team Rocket this id is 243083329203608905
-    const string pantheonId = "";
+    var pantheonId = "";
 
-    if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(pantheonId))
-    {
-        "Please enter all the required form fields above.".Dump("ERROR");
-        return;
-    }
 
     var browser = new Browser();
     var checkTime = DateTime.Now;
     var members = new List<GuildMember>();
 
+    CheckAelinetDetailsWithEnvironmentFallback(ref username, ref password, ref pantheonId);
+    LoginToAelinet(browser, username, password);
+
+    NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.PantheonMember);
+    NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.AcademyMember);
+
+    members.OrderBy(x => x.Name).Dump();
+}
+
+static void LoginToAelinet(Browser browser, string username, string password)
+{
     //Use uk english rules for parsing rather than current machine locale
     CultureInfo.CurrentCulture = CultureInfo.CreateSpecificCulture("en-gb");
 
@@ -38,21 +49,34 @@ void Main()
     {
         browser.Find(ElementType.TextField, FindBy.Id, "login").Value = username;
         browser.Find(ElementType.TextField, FindBy.Id, "password").Value = password;
-        browser.Find(ElementType.Checkbox, FindBy.Id, "remember").Checked = true;
+        browser.Find(ElementType.Checkbox, FindBy.Id, "remember").Checked = false;
         browser.Find(ElementType.Button, FindBy.Value, "log in").Click();
     }
+}
 
-    NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.PantheonMember);
-    NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.AcademyMember);
+static void CheckAelinetDetailsWithEnvironmentFallback(ref string username, ref string password, ref string pantheonId)
+{
+    if (string.IsNullOrWhiteSpace(username))
+        username = Environment.GetEnvironmentVariable("SKYFORGE_LOGIN");
 
-    members.OrderBy(x => x.Name).Dump();
+    if (string.IsNullOrWhiteSpace(password))
+        password = Environment.GetEnvironmentVariable("SKYFORGE_PASSWORD");
+
+    if (string.IsNullOrWhiteSpace(pantheonId))
+        pantheonId = Environment.GetEnvironmentVariable("SKYFORGE_PANTHEONID");
+
+    if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(pantheonId))
+    {
+        "Please enter all the required form fields: username, password, pantheonId.".Dump("ERROR");
+        return;
+    }
 }
 
 static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> members, Browser browser, DateTime checkTime, MemberType memberType)
 {
     var paging = new HashSet<string>();
     var sectionName = memberType == MemberType.PantheonMember ? "members" : "academy";
-    
+
     browser.Navigate($"https://eu.portal.sf.my.com/guild/{sectionName}/{pantheonId}");
     ParseGuildMembers(browser.XDocument.Root, members, checkTime, memberType);
 
