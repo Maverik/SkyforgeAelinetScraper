@@ -1,10 +1,11 @@
 <Query Kind="Program">
-  <NuGetReference Prerelease="true">Newtonsoft.Json</NuGetReference>
-  <NuGetReference>SimpleBrowser</NuGetReference>
-  <Namespace>Newtonsoft.Json</Namespace>
-  <Namespace>SimpleBrowser</Namespace>
-  <Namespace>System.Globalization</Namespace>
-  <Namespace>System.Net</Namespace>
+<NuGetReference Prerelease="true">Newtonsoft.Json</NuGetReference>
+<NuGetReference>SimpleBrowser</NuGetReference>
+<Namespace>Newtonsoft.Json</Namespace>
+<Namespace>SimpleBrowser</Namespace>
+<Namespace>System.Globalization</Namespace>
+<Namespace>System.Net</Namespace>
+<Namespace>System.Threading.Tasks</Namespace>
 </Query>
 
 void Main()
@@ -24,7 +25,6 @@ void Main()
     //for example for Team Rocket this id is 243083329203608905
     var pantheonId = "";
 
-
     var browser = new Browser();
     var checkTime = DateTime.Now;
     var members = new List<GuildMember>();
@@ -34,9 +34,28 @@ void Main()
 
     NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.PantheonMember);
     NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.AcademyMember);
-
     members.OrderBy(x => x.Name).Dump();
 }
+
+static readonly Dictionary<string, string> DistortionToShortCodeLookup = new Dictionary<string, string> {
+    {"Onslaught of the Sea: Alciona and Melia", "A1"},
+    {"Onslaught of the Sea: Lorro the Cold","A2"},
+    {"Onslaught of the Sea: Wise Latanu","A3"},
+    {"Onslaught of the Sea: Nautilus","A4"},
+    {"Dangerous Greenhouse: Caryolis","B1"},
+    {"Dangerous Greenhouse: Malicenia","B2"},
+    {"Dangerous Greenhouse: Siringe","B3"},
+    {"Dangerous Greenhouse: Nephelis","B4"},
+    {"Mechanoid Base: Secret Oculat","C1"},
+    {"Mechanoid Base: Scissor Saboteur","C2"},
+    {"Mechanoid Base: Operative Secutor","C3"},
+    {"Mechanoid Base: Rethiarius Commander","C4"},
+    // Unknown distortions at this point:
+    //	{"","D1"},
+    //	{"","D2"},
+    //	{"","D3"},
+    //	{"","D4"},
+};
 
 static void LoginToAelinet(Browser browser, string username, string password)
 {
@@ -72,15 +91,72 @@ static void CheckAelinetDetailsWithEnvironmentFallback(ref string username, ref 
     }
 }
 
-static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> members, Browser browser, DateTime checkTime, MemberType memberType)
+static void SetMemberDistortions(GuildMember member, Browser masterBrowser, string csrf_token)
 {
+    var browser = masterBrowser.CreateReferenceView();
+
+    browser.Accept = "application/json";
+    browser.SetHeader("X-Requested-With: XMLHttpRequest");
+
+    browser.Navigate($"https://eu.portal.sf.my.com/api/game/stats/StatsApi:getAvatarStats/{member.MemberId}?csrf_token={csrf_token}");
+
+    var distortions = JsonConvert.DeserializeObject<RootObject>(browser.CurrentHtml).adventureStats.byAdventureStats.Where(x => x.rule.types.Contains(RuleTypes.RULE_TYPE_PVE) && x.rule.types.Contains(RuleTypes.RULE_TYPE_DIMENSION))
+                            .Select(x => new AdventureInfo { AdventureType = AdventureType.Distortion, CompletionCount = int.Parse(x.completionsCount), Name = x.rule.name.Trim(' ', '.') }).ToArray();
+
+    foreach (var distortion in distortions.Where(x => DistortionToShortCodeLookup.ContainsKey(x.Name.Replace(" (Rated)", string.Empty).Trim())))
+        distortion.ShortCode = DistortionToShortCodeLookup[distortion.Name.Replace(" (Rated)", string.Empty).Trim()] + (distortion.IsRated ? "R" : string.Empty);
+
+    member.A1 = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.A1))?.CompletionCount ?? 0;
+    member.A1R = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.A1R))?.CompletionCount ?? 0;
+    member.A2 = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.A2))?.CompletionCount ?? 0;
+    member.A2R = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.A2R))?.CompletionCount ?? 0;
+    member.A3 = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.A3))?.CompletionCount ?? 0;
+    member.A3R = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.A3R))?.CompletionCount ?? 0;
+    member.A4 = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.A4))?.CompletionCount ?? 0;
+    member.A4R = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.A4R))?.CompletionCount ?? 0;
+    member.B1 = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.B1))?.CompletionCount ?? 0;
+    member.B1R = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.B1R))?.CompletionCount ?? 0;
+    member.B2 = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.B2))?.CompletionCount ?? 0;
+    member.B2R = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.B2R))?.CompletionCount ?? 0;
+    member.B3 = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.B3))?.CompletionCount ?? 0;
+    member.B3R = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.B3R))?.CompletionCount ?? 0;
+    member.B4 = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.B4))?.CompletionCount ?? 0;
+    member.B4R = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.B4R))?.CompletionCount ?? 0;
+    member.C1 = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.C1))?.CompletionCount ?? 0;
+    member.C1R = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.C1R))?.CompletionCount ?? 0;
+    member.C2 = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.C2))?.CompletionCount ?? 0;
+    member.C2R = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.C2R))?.CompletionCount ?? 0;
+    member.C3 = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.C3))?.CompletionCount ?? 0;
+    member.C3R = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.C3R))?.CompletionCount ?? 0;
+    member.C4 = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.C4))?.CompletionCount ?? 0;
+    member.C4R = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.C4R))?.CompletionCount ?? 0;
+}
+
+static void SetMemberProfileStats(GuildMember member, Browser masterBrowser, string csrf_token)
+{
+    var browser = masterBrowser.CreateReferenceView();
+
+    browser.Navigate($"https://eu.portal.sf.my.com/user/avatar/{member.MemberId}");
+    var tacticalSenseNode = browser.Find("span", FindBy.Text, "Tactical Sense");
+    var rawValue = browser.FindClosestAncestor(tacticalSenseNode, "p").XElement.XPathSelectElement("em").Value.Trim('{', '}', ' ').Split('|').Select(x => x.Trim()).First();
+    member.TacticalSense = (int)double.Parse(rawValue);
+}
+
+static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> members, Browser masterBrowser, DateTime checkTime, MemberType memberType)
+{
+    var browser = masterBrowser.CreateReferenceView();
     var paging = new HashSet<string>();
     var sectionName = memberType == MemberType.PantheonMember ? "members" : "academy";
 
     browser.Navigate($"https://eu.portal.sf.my.com/guild/{sectionName}/{pantheonId}");
+
+    var csrf_token = new Uri(browser.Find(ElementType.Anchor, FindBy.PartialText, "English").GetAttribute("href")).Query.Substring(1).Split('&').First(x => x.StartsWith("csrf_token")).Split('=')[1];
+
     ParseGuildMembers(browser.XDocument.Root, members, checkTime, memberType);
 
     var page = 2;
+
+    var backgroundTasks = new List<Task>();
 
     XElement nextLink;
     while ((nextLink = browser.XDocument.Root.XPathSelectElement($"//div[@class=\"paging\"]/a[text()={page}]")) != null)
@@ -95,8 +171,19 @@ static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> mem
         browser.SetContent(json.zones.listZone);
 
         ParseGuildMembers(browser.XDocument.Root, members, checkTime, memberType);
+
+        if (memberType == MemberType.PantheonMember)
+            foreach (var member in members)
+            {
+                Thread.Sleep(3000);
+                backgroundTasks.Add(Task.Run(() => SetMemberDistortions(member, browser, csrf_token))
+                .ContinueWith(_ => SetMemberProfileStats(member, browser, csrf_token)));
+            }
+
         page++;
     }
+
+    Task.WaitAll(backgroundTasks.ToArray());
 }
 
 static void ParseGuildMembers(XElement documentRoot, List<GuildMember> members, DateTime checkTime, MemberType memberType)
@@ -142,7 +229,7 @@ static long GetNumberInLong(string buffer)
 
     if (char.IsNumber(suffix)) suffix = (char)0;
 
-    var number = float.Parse(trimmedBuffer.Replace(suffix.ToString(), "").Trim());
+    var number = double.Parse(trimmedBuffer.Replace(suffix.ToString(), "").Trim());
 
     switch (char.ToUpper(suffix))
     {
@@ -172,6 +259,40 @@ class GuildMember
     public MemberType MemberType { get; set; }
     public string ProfileUrl { get; set; }
     public string ImageUrl { get; set; }
+    public int TacticalSense { get; set; }
+    public int A1 { get; set; }
+    public int A1R { get; set; }
+    public int A2 { get; set; }
+    public int A2R { get; set; }
+    public int A3 { get; set; }
+    public int A3R { get; set; }
+    public int A4 { get; set; }
+    public int A4R { get; set; }
+    public int B1 { get; set; }
+    public int B1R { get; set; }
+    public int B2 { get; set; }
+    public int B2R { get; set; }
+    public int B3 { get; set; }
+    public int B3R { get; set; }
+    public int B4 { get; set; }
+    public int B4R { get; set; }
+    public int C1 { get; set; }
+    public int C1R { get; set; }
+    public int C2 { get; set; }
+    public int C2R { get; set; }
+    public int C3 { get; set; }
+    public int C3R { get; set; }
+    public int C4 { get; set; }
+    public int C4R { get; set; }
+    //unknown distortions at this time but reserving space
+    public int D1 { get; set; }
+    public int D1R { get; set; }
+    public int D2 { get; set; }
+    public int D2R { get; set; }
+    public int D3 { get; set; }
+    public int D3R { get; set; }
+    public int D4 { get; set; }
+    public int D4R { get; set; }
 }
 
 enum MemberType
@@ -179,3 +300,162 @@ enum MemberType
     PantheonMember,
     AcademyMember
 }
+
+class AdventureInfo
+{
+    public string ShortCode { get; set; }
+    public string Name { get; set; }
+    public AdventureType AdventureType { get; set; }
+    public int CompletionCount { get; set; }
+    public bool IsRated { get { return !string.IsNullOrEmpty(Name) && Name.EndsWith("(Rated)"); } }
+}
+
+enum AdventureType
+{
+    Squad,
+    Group,
+    Distortion,
+    Invasion,
+    Avatar
+}
+
+#region Json2CSharp classes
+
+public enum RuleTypes
+{
+    RULE_TYPE_AIR, //No idea what this is
+    RULE_TYPE_DIMENSION, //Distortion
+    RULE_TYPE_SOLO, //Squad
+    RULE_TYPE_GROUP,
+    RULE_TYPE_PVE,
+    RULE_TYPE_PVP,
+    RULE_TYPE_DROP_SHIP, //Invasion missions including training avatar
+    RULE_TYPE_CUBE, //Training stuff?
+    RULE_TYPE_RIFT //Champion
+}
+
+public class DailyStat
+{
+    public string pvpDeaths { get; set; }
+    public string pveBossKills { get; set; }
+    public string pveMobKills { get; set; }
+    public string pvpAssists { get; set; }
+    public string pvpKills { get; set; }
+    public string pveDeaths { get; set; }
+}
+
+public class AllDaysStats
+{
+    public string pvpDeaths { get; set; }
+    public string pveBossKills { get; set; }
+    public string pveMobKills { get; set; }
+    public string pvpAssists { get; set; }
+    public string pvpKills { get; set; }
+    public string pveDeaths { get; set; }
+}
+
+public class PvpStats
+{
+    public double skill { get; set; }
+    public int ratingGamesCount { get; set; }
+}
+
+public class Stats
+{
+    public string pvpDeaths { get; set; }
+    public string pveBossKills { get; set; }
+    public string pveMobKills { get; set; }
+    public string pvpAssists { get; set; }
+    public string pvpKills { get; set; }
+    public string pveDeaths { get; set; }
+}
+
+public class CharacterClass
+{
+    public int resourceId { get; set; }
+    public string name { get; set; }
+    public string imageSrc { get; set; }
+}
+
+public class ClassStat
+{
+    public Stats stats { get; set; }
+    public CharacterClass characterClass { get; set; }
+    public string secondsPlayed { get; set; }
+    public string secondsActivePlayed { get; set; }
+}
+
+public class AvatarStats
+{
+    public int trueSkillMultiplier { get; set; }
+    public int ratingGamesTreshold { get; set; }
+    public DailyStat[] dailyStats { get; set; }
+    public AllDaysStats allDaysStats { get; set; }
+    public string secondsPlayed { get; set; }
+    public string daysToShow { get; set; }
+    public PvpStats pvpStats { get; set; }
+    public ClassStat[] classStats { get; set; }
+    public string secondsActivePlayed { get; set; }
+    public long timestamp { get; set; }
+}
+
+public class AdventureTypes
+{
+    public string dimension_type { get; set; }
+    public string air_type { get; set; }
+    public string solo_type { get; set; }
+    public string pve_type { get; set; }
+    public string group_type { get; set; }
+    public string pvp_type { get; set; }
+}
+
+public class Rule
+{
+    public string image { get; set; }
+    public RuleTypes[] types { get; set; }
+    public int resourceId { get; set; }
+    public string name { get; set; }
+}
+
+public class Medal
+{
+    public int medalCount { get; set; }
+    public string medalKind { get; set; }
+}
+
+public class ByAdventureStat
+{
+    public string failtureCount { get; set; }
+    public string bestLadderRatingGrade { get; set; }
+    public Medal[] medals { get; set; }
+    public string bestLadderRating { get; set; }
+    public string timeSpent { get; set; }
+    public string bestScore { get; set; }
+    public string bestLadderTimeGrade { get; set; }
+    public string pvpWins { get; set; }
+    public Rule rule { get; set; }
+    public string completionsCount { get; set; }
+    public string bestLadderTime { get; set; }
+}
+
+public class AdventureStats
+{
+    public string encyclopediaLink { get; set; }
+    public AdventureTypes adventureTypes { get; set; }
+    public ByAdventureStat[] byAdventureStats { get; set; }
+}
+
+public class Switchers
+{
+    public bool adventureStatsEnabled { get; set; }
+    public bool displayTrueSkill { get; set; }
+}
+
+public class RootObject
+{
+    public AvatarStats avatarStats { get; set; }
+    public AdventureStats adventureStats { get; set; }
+    public Switchers switchers { get; set; }
+}
+
+#endregion
