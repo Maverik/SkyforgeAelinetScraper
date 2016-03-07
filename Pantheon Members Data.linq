@@ -1,11 +1,11 @@
 <Query Kind="Program">
-<NuGetReference Prerelease="true">Newtonsoft.Json</NuGetReference>
-<NuGetReference>SimpleBrowser</NuGetReference>
-<Namespace>Newtonsoft.Json</Namespace>
-<Namespace>SimpleBrowser</Namespace>
-<Namespace>System.Globalization</Namespace>
-<Namespace>System.Net</Namespace>
-<Namespace>System.Threading.Tasks</Namespace>
+  <NuGetReference Prerelease="true">Newtonsoft.Json</NuGetReference>
+  <NuGetReference>SimpleBrowser</NuGetReference>
+  <Namespace>Newtonsoft.Json</Namespace>
+  <Namespace>SimpleBrowser</Namespace>
+  <Namespace>System.Globalization</Namespace>
+  <Namespace>System.Net</Namespace>
+  <Namespace>System.Threading.Tasks</Namespace>
 </Query>
 
 void Main()
@@ -21,20 +21,30 @@ void Main()
     //Your password for Aelinet login
     var password = "";
 
-    //you can get this by visiting your pantheon community page in aelinet. It's the last numbers bit in your address bar.
+    //You can get this by visiting your pantheon community page in aelinet. It's the last numbers bit in your address bar.
     //for example for Team Rocket this id is 243083329203608905
     var pantheonId = "";
+
+    //Report extended stats for players. Please note that this will significantly increase time to report data if set to true
+    //The run time will increase upwards of 4 seconds per Pantheon member (academy members are not parsed for these stats)
+    //Please do not fiddle with 4 seconds to make things any faster unless you take responsibility for possibly getting banned
+    //for abusing this tool or any other sanctions that may be applied to you and anybody else in pantheon by official customer support
+    //YOU HAVE BEEN WARNED!
+    var reportDistortionData = false;
+    var reportPlayerProfileData = false;
 
     var browser = new Browser();
     var checkTime = DateTime.Now;
     var members = new List<GuildMember>();
 
-    CheckAelinetDetailsWithEnvironmentFallback(ref username, ref password, ref pantheonId);
-    LoginToAelinet(browser, username, password);
+    if (CheckAelinetDetailsWithEnvironmentFallback(ref username, ref password, ref pantheonId))
+    {
+        LoginToAelinet(browser, username, password);
 
-    NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.PantheonMember);
-    NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.AcademyMember);
-    members.OrderBy(x => x.Name).Dump();
+        NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.PantheonMember, reportPlayerProfileData, reportDistortionData);
+        NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.AcademyMember);
+        members.OrderBy(x => x.Name).Dump();
+    }
 }
 
 static readonly Dictionary<string, string> DistortionToShortCodeLookup = new Dictionary<string, string> {
@@ -64,16 +74,15 @@ static void LoginToAelinet(Browser browser, string username, string password)
 
     browser.Navigate($"https://eu.portal.sf.my.com/skyforgenews");
 
-    if (browser.Find(ElementType.TextField, FindBy.Id, "login") != null)
-    {
-        browser.Find(ElementType.TextField, FindBy.Id, "login").Value = username;
-        browser.Find(ElementType.TextField, FindBy.Id, "password").Value = password;
-        browser.Find(ElementType.Checkbox, FindBy.Id, "remember").Checked = false;
-        browser.Find(ElementType.Button, FindBy.Value, "log in").Click();
-    }
+    if (browser.Find(ElementType.TextField, FindBy.Id, "login") == null) return;
+
+    browser.Find(ElementType.TextField, FindBy.Id, "login").Value = username;
+    browser.Find(ElementType.TextField, FindBy.Id, "password").Value = password;
+    browser.Find(ElementType.Checkbox, FindBy.Id, "remember").Checked = false;
+    browser.Find(ElementType.Button, FindBy.Value, "log in").Click();
 }
 
-static void CheckAelinetDetailsWithEnvironmentFallback(ref string username, ref string password, ref string pantheonId)
+static bool CheckAelinetDetailsWithEnvironmentFallback(ref string username, ref string password, ref string pantheonId)
 {
     if (string.IsNullOrWhiteSpace(username))
         username = Environment.GetEnvironmentVariable("SKYFORGE_LOGIN");
@@ -84,21 +93,20 @@ static void CheckAelinetDetailsWithEnvironmentFallback(ref string username, ref 
     if (string.IsNullOrWhiteSpace(pantheonId))
         pantheonId = Environment.GetEnvironmentVariable("SKYFORGE_PANTHEONID");
 
-    if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(pantheonId))
-    {
-        "Please enter all the required form fields: username, password, pantheonId.".Dump("ERROR");
-        return;
-    }
+    if (!string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password) && !string.IsNullOrWhiteSpace(pantheonId)) return true;
+
+    "Please enter all the required form fields: username, password, pantheonId.".Dump("ERROR");
+    return false;
 }
 
-static void SetMemberDistortions(GuildMember member, Browser masterBrowser, string csrf_token)
+static void SetMemberDistortions(GuildMember member, Browser masterBrowser, string csrfToken)
 {
     var browser = masterBrowser.CreateReferenceView();
 
     browser.Accept = "application/json";
     browser.SetHeader("X-Requested-With: XMLHttpRequest");
 
-    browser.Navigate($"https://eu.portal.sf.my.com/api/game/stats/StatsApi:getAvatarStats/{member.MemberId}?csrf_token={csrf_token}");
+    browser.Navigate($"https://eu.portal.sf.my.com/api/game/stats/StatsApi:getAvatarStats/{member.MemberId}?csrf_token={csrfToken}");
 
     var distortions = JsonConvert.DeserializeObject<RootObject>(browser.CurrentHtml).adventureStats.byAdventureStats.Where(x => x.rule.types.Contains(RuleTypes.RULE_TYPE_PVE) && x.rule.types.Contains(RuleTypes.RULE_TYPE_DIMENSION))
                             .Select(x => new AdventureInfo { AdventureType = AdventureType.Distortion, CompletionCount = int.Parse(x.completionsCount), Name = x.rule.name.Trim(' ', '.') }).ToArray();
@@ -132,7 +140,7 @@ static void SetMemberDistortions(GuildMember member, Browser masterBrowser, stri
     member.C4R = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.C4R))?.CompletionCount ?? 0;
 }
 
-static void SetMemberProfileStats(GuildMember member, Browser masterBrowser, string csrf_token)
+static void SetMemberProfileStats(GuildMember member, Browser masterBrowser)
 {
     var browser = masterBrowser.CreateReferenceView();
 
@@ -142,15 +150,14 @@ static void SetMemberProfileStats(GuildMember member, Browser masterBrowser, str
     member.TacticalSense = (int)double.Parse(rawValue);
 }
 
-static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> members, Browser masterBrowser, DateTime checkTime, MemberType memberType)
+static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> members, Browser masterBrowser, DateTime checkTime, MemberType memberType, bool reportPlayerStatData = false, bool reportDistortionData = false)
 {
     var browser = masterBrowser.CreateReferenceView();
-    var paging = new HashSet<string>();
     var sectionName = memberType == MemberType.PantheonMember ? "members" : "academy";
 
     browser.Navigate($"https://eu.portal.sf.my.com/guild/{sectionName}/{pantheonId}");
 
-    var csrf_token = new Uri(browser.Find(ElementType.Anchor, FindBy.PartialText, "English").GetAttribute("href")).Query.Substring(1).Split('&').First(x => x.StartsWith("csrf_token")).Split('=')[1];
+    var csrfToken = new Uri(browser.Find(ElementType.Anchor, FindBy.PartialText, "English").GetAttribute("href")).Query.Substring(1).Split('&').First(x => x.StartsWith("csrf_token")).Split('=')[1];
 
     ParseGuildMembers(browser.XDocument.Root, members, checkTime, memberType);
 
@@ -167,17 +174,26 @@ static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> mem
         browser.Accept = "text/javascript, text/html, application/xml, text/xml, */*";
         browser.Navigate(new Uri(link), "t%3Azoneid=listZone", "application/x-www-form-urlencoded; charset=UTF-8");
 
-        var json = JsonConvert.DeserializeAnonymousType(browser.CurrentHtml, new { inits = new Object(), zones = new { listZone = "" } });
+        var json = JsonConvert.DeserializeAnonymousType(browser.CurrentHtml, new { inits = new object(), zones = new { listZone = "" } });
         browser.SetContent(json.zones.listZone);
 
         ParseGuildMembers(browser.XDocument.Root, members, checkTime, memberType);
 
-        if (memberType == MemberType.PantheonMember)
-            foreach (var member in members)
+        if (memberType == MemberType.PantheonMember && (reportDistortionData || reportPlayerStatData))
+            foreach (var member in members.Where(m => m.MemberType == MemberType.PantheonMember))
             {
                 Thread.Sleep(3000);
-                backgroundTasks.Add(Task.Run(() => SetMemberDistortions(member, browser, csrf_token))
-                .ContinueWith(_ => SetMemberProfileStats(member, browser, csrf_token)));
+
+                backgroundTasks.Add(Task.Run(() =>
+                {
+                    if (reportDistortionData)
+                        SetMemberDistortions(member, browser, csrfToken);
+                })
+                .ContinueWith(_ =>
+                {
+                    if (reportPlayerStatData)
+                        SetMemberProfileStats(member, browser);
+                }));
             }
 
         page++;
@@ -241,12 +257,16 @@ static long GetNumberInLong(string buffer)
 
 }
 
+#region DTOs
+
+// ReSharper disable UnusedAutoPropertyAccessor.Global
+// ReSharper disable MemberCanBePrivate.Global
 class GuildMember
 {
-    private static readonly GregorianCalendar _calendar = new GregorianCalendar();
+    static readonly GregorianCalendar Calendar = new GregorianCalendar();
 
     public DateTime CheckTime { get; set; }
-    public byte WeekNumber => (byte)_calendar.GetWeekOfYear(CheckTime, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+    public byte WeekNumber => (byte)Calendar.GetWeekOfYear(CheckTime, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
     public long MemberId => long.Parse(ProfileUrl.Split('/').Last());
     public string Name { get; set; }
     public int Prestige { get; set; }
@@ -307,7 +327,7 @@ class AdventureInfo
     public string Name { get; set; }
     public AdventureType AdventureType { get; set; }
     public int CompletionCount { get; set; }
-    public bool IsRated { get { return !string.IsNullOrEmpty(Name) && Name.EndsWith("(Rated)"); } }
+    public bool IsRated => !string.IsNullOrEmpty(Name) && Name.EndsWith("(Rated)");
 }
 
 enum AdventureType
@@ -320,7 +340,8 @@ enum AdventureType
 }
 
 #region Json2CSharp classes
-
+// ReSharper disable InconsistentNaming
+// ReSharper disable ClassNeverInstantiated.Global
 public enum RuleTypes
 {
     RULE_TYPE_AIR, //No idea what this is
@@ -457,5 +478,9 @@ public class RootObject
     public AdventureStats adventureStats { get; set; }
     public Switchers switchers { get; set; }
 }
-
+// ReSharper restore ClassNeverInstantiated.Global
+// ReSharper restore InconsistentNaming
+// ReSharper restore MemberCanBePrivate.Global
+// ReSharper restore UnusedAutoPropertyAccessor.Global
+#endregion
 #endregion
