@@ -43,7 +43,7 @@ void Main()
 
         NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.PantheonMember, reportPlayerProfileData, reportDistortionData);
         NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.AcademyMember);
-        
+
         Util.ClearResults();
         members.OrderBy(x => x.Name).Dump();
     }
@@ -163,8 +163,9 @@ static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> mem
     var nextPage = 2;
 
     //DEBUGGING AIDS - DON'T MESS WITH THESE UNLESS YOU KNOW WHAT YOU'RE DOING
-    var upToPage = 0;
+    //THIS TAKES EFFECT ON BOTH TYPES OF MEMBERS
     var skipToPage = 0;
+    var upToPage = 0;
     
     browser.Navigate($"https://eu.portal.sf.my.com/guild/{sectionName}/{pantheonId}");
 
@@ -174,16 +175,15 @@ static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> mem
 
     //Handle the landing page (1st page)
     if (skipToPage < 2)
-    {        
+    {
         parsedMembers = ParseGuildMembers(browser.XDocument.Root, checkTime, memberType).ToArray();
         backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType, browser, csrfToken, reportPlayerStatData, reportDistortionData));
 
         members.AddRange(parsedMembers);
     }
-    else $"{DateTime.Now.ToString(TimestampFormat)} Skipping page 1".Dump();
 
     XElement nextLink;
-    while (upToPage > 0 && nextPage <= upToPage && (nextLink = browser.XDocument.Root.XPathSelectElement($"//div[@class=\"paging\"]/a[text()={nextPage}]")) != null)
+    while ((nextLink = browser.XDocument.Root.XPathSelectElement($"//div[@class=\"paging\"]/a[text()={nextPage}]")) != null)
     {
         Util.ClearResults();
         string.Format("{0} Processing Page {1} for {2}...", DateTime.Now.ToString(TimestampFormat), nextPage, memberType == MemberType.PantheonMember ? "pantheon members" : "academy members").Dump();
@@ -207,6 +207,8 @@ static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> mem
         backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType, browser, csrfToken, reportPlayerStatData, reportDistortionData));
         members.AddRange(parsedMembers);
 
+        if (upToPage > 0 && (nextPage - upToPage + 1 > 0)) break;
+        
         nextPage++;
     }
 
