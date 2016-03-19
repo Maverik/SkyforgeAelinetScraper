@@ -43,9 +43,13 @@ void Main()
 
         NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.PantheonMember, reportPlayerProfileData, reportDistortionData);
         NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.AcademyMember);
+        
+        Util.ClearResults();
         members.OrderBy(x => x.Name).Dump();
     }
 }
+
+const string TimestampFormat = "HH:mm:ss.f";
 
 static readonly Dictionary<string, string> DistortionToShortCodeLookup = new Dictionary<string, string> {
     {"Onslaught of the Sea: Alciona and Melia", "A1"},
@@ -154,20 +158,36 @@ static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> mem
 {
     var browser = masterBrowser.CreateReferenceView();
     var sectionName = memberType == MemberType.PantheonMember ? "members" : "academy";
+    var backgroundTasks = new List<Task>();
+    GuildMember[] parsedMembers;
+    var nextPage = 2;
 
+    //DEBUGGING AIDS - DON'T MESS WITH THESE UNLESS YOU KNOW WHAT YOU'RE DOING
+    var upToPage = 0;
+    var skipToPage = 0;
+    
     browser.Navigate($"https://eu.portal.sf.my.com/guild/{sectionName}/{pantheonId}");
 
     var csrfToken = new Uri(browser.Find(ElementType.Anchor, FindBy.PartialText, "English").GetAttribute("href")).Query.Substring(1).Split('&').First(x => x.StartsWith("csrf_token")).Split('=')[1];
 
-    ParseGuildMembers(browser.XDocument.Root, members, checkTime, memberType);
+    string.Format("{0} Processing Page {1} for {2}...", DateTime.Now.ToString(TimestampFormat), 1, memberType == MemberType.PantheonMember ? "pantheon members" : "academy members").Dump();
 
-    var page = 2;
+    //Handle the landing page (1st page)
+    if (skipToPage < 2)
+    {        
+        parsedMembers = ParseGuildMembers(browser.XDocument.Root, checkTime, memberType).ToArray();
+        backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType, browser, csrfToken, reportPlayerStatData, reportDistortionData));
 
-    var backgroundTasks = new List<Task>();
+        members.AddRange(parsedMembers);
+    }
+    else $"{DateTime.Now.ToString(TimestampFormat)} Skipping page 1".Dump();
 
     XElement nextLink;
-    while ((nextLink = browser.XDocument.Root.XPathSelectElement($"//div[@class=\"paging\"]/a[text()={page}]")) != null)
+    while (upToPage > 0 && nextPage <= upToPage && (nextLink = browser.XDocument.Root.XPathSelectElement($"//div[@class=\"paging\"]/a[text()={nextPage}]")) != null)
     {
+        Util.ClearResults();
+        string.Format("{0} Processing Page {1} for {2}...", DateTime.Now.ToString(TimestampFormat), nextPage, memberType == MemberType.PantheonMember ? "pantheon members" : "academy members").Dump();
+
         var link = nextLink.Attribute("href").Value;
         browser.SetHeader("X-Requested-With: XMLHttpRequest");
         browser.SetHeader("X-Prototype-Version: 1.7");
@@ -177,34 +197,49 @@ static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> mem
         var json = JsonConvert.DeserializeAnonymousType(browser.CurrentHtml, new { inits = new object(), zones = new { listZone = "" } });
         browser.SetContent(json.zones.listZone);
 
-        ParseGuildMembers(browser.XDocument.Root, members, checkTime, memberType);
+        if (skipToPage - nextPage > 0)
+        {
+            nextPage++;
+            continue;
+        }
 
-        if (memberType == MemberType.PantheonMember && (reportDistortionData || reportPlayerStatData))
-            foreach (var member in members.Where(m => m.MemberType == MemberType.PantheonMember))
-            {
-                Thread.Sleep(3000);
+        parsedMembers = ParseGuildMembers(browser.XDocument.Root, checkTime, memberType).ToArray();
+        backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType, browser, csrfToken, reportPlayerStatData, reportDistortionData));
+        members.AddRange(parsedMembers);
 
-                backgroundTasks.Add(Task.Run(() =>
-                {
-                    if (reportDistortionData)
-                        SetMemberDistortions(member, browser, csrfToken);
-                })
-                .ContinueWith(_ =>
-                {
-                    if (reportPlayerStatData)
-                        SetMemberProfileStats(member, browser);
-                }));
-            }
-
-        page++;
+        nextPage++;
     }
 
     Task.WaitAll(backgroundTasks.ToArray());
 }
 
-static void ParseGuildMembers(XElement documentRoot, List<GuildMember> members, DateTime checkTime, MemberType memberType)
+static IEnumerable<Task> SetMemberStats(IEnumerable<GuildMember> members, MemberType memberType, Browser browser, string csrfToken, bool reportPlayerStatData = false, bool reportDistortionData = false)
 {
-    members.AddRange(documentRoot.XPathSelectElements("//div[@class=\"guild-member\"]/div/div").OfType<XElement>().Select(x => new
+    //ticks here get truncated in value but irrelevant for the purpose of seed;
+    var fudger = new Random((int)DateTime.Now.Ticks);
+
+    if (memberType == MemberType.PantheonMember && (reportDistortionData || reportPlayerStatData))
+        foreach (var member in members.Where(m => m.MemberType == MemberType.PantheonMember))
+        {
+            $"{DateTime.Now.ToString(TimestampFormat)} Processing {member.Name}".Dump();
+            Thread.Sleep(1000 + fudger.Next(500, 3000));
+
+            yield return Task.Run(() =>
+            {
+                if (reportDistortionData)
+                    SetMemberDistortions(member, browser, csrfToken);
+            })
+            .ContinueWith(_ =>
+            {
+                if (reportPlayerStatData)
+                    SetMemberProfileStats(member, browser);
+            });
+        }
+}
+
+static IEnumerable<GuildMember> ParseGuildMembers(XElement documentRoot, DateTime checkTime, MemberType memberType)
+{
+    return documentRoot.XPathSelectElements("//div[@class=\"guild-member\"]/div/div").OfType<XElement>().Select(x => new
     {
         DocumentRoot = x,
         CheckTime = checkTime,
@@ -233,7 +268,7 @@ static void ParseGuildMembers(XElement documentRoot, List<GuildMember> members, 
         ProfileUrl = x.IsBanned ? x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-title\"]/a").Attribute("href").Value
             : x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-name\"]/span/a").Attribute("href").Value,
         MemberType = memberType
-    }));
+    });
 }
 
 //this is meant to store everything in uniform prestige format instead of suffix format. Makes life easier during analysis & filtering
