@@ -149,9 +149,20 @@ static void SetMemberProfileStats(GuildMember member, Browser masterBrowser)
     var browser = masterBrowser.CreateReferenceView();
 
     browser.Navigate($"https://eu.portal.sf.my.com/user/avatar/{member.MemberId}");
-    var tacticalSenseNode = browser.Find("span", FindBy.Text, "Tactical Sense");
-    var rawValue = browser.FindClosestAncestor(tacticalSenseNode, "p").XElement.XPathSelectElement("em").Value.Trim('{', '}', ' ').Split('|').Select(x => x.Trim()).First();
-    member.TacticalSense = (int)double.Parse(rawValue);
+
+    var stats = browser.Select("#portalPageBody div.region-page-body div p > span")
+                .Select(b => b.Value)
+                .Zip(browser.Select("#portalPageBody div.region-page-body div p > span + em")
+                            .Select(b => b.Value),
+                        (k, v) => new
+                        {
+                            Stat = k,
+                            Value = string.Join(" - ", v.Trim().Split('-').SelectMany(rV => rV.Split('|').Select(x => x.Trim(' ', '{', '}', '%'))).Where((_, i) => i % 2 == 0))
+                        })
+                .ToDictionary(x => x.Stat, x => x.Value, StringComparer.OrdinalIgnoreCase);
+
+    if(stats.ContainsKey("Tactical Sense"))
+    member.TacticalSense = (int)double.Parse(stats["Tactical Sense"]);
 }
 
 static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> members, Browser masterBrowser, DateTime checkTime, MemberType memberType, bool reportPlayerStatData = false, bool reportDistortionData = false)
