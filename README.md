@@ -10,3 +10,6 @@ The script is run using the freely available and excellent tool called LINQPad (
 Upon successful activation of script, it will display a table that can then be used as input for other purposes.
 
 [A template sheet](https://github.com/Venomed/SkyforgeAelinetScraper/raw/master/Pantheon%20Data%20Statistics%20Template.xlsx) that we use in our own pantheon feeding off the above data is available for a jumpstart on analytics.
+
+#### Demo chart from the template sheet
+![Chart Demo.png](Chart Demo.png)
