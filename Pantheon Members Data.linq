@@ -40,9 +40,24 @@ void Main()
     if (CheckAelinetDetailsWithEnvironmentFallback(ref username, ref password, ref pantheonId))
     {
         LoginToAelinet(browser, username, password);
+        Locale userLocale = Locale.EN;
 
-        NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.PantheonMember, reportPlayerProfileData, reportDistortionData);
-        NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.AcademyMember);
+        try
+        {
+            userLocale = (Locale)Enum.Parse(typeof(Locale), GetCurrentAelinetLocale(browser));
+
+            if (userLocale != Locale.EN)
+                SetCurrentAelinetLocale(browser, Locale.EN);
+
+            NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.PantheonMember, reportPlayerProfileData, reportDistortionData);
+            NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.AcademyMember);
+
+        }
+        finally
+        {
+            if (userLocale != Locale.EN)
+                SetCurrentAelinetLocale(browser, userLocale);
+        }
 
         Util.ClearResults();
         members.OrderBy(x => x.Name).Dump();
@@ -50,6 +65,24 @@ void Main()
 }
 
 const string TimestampFormat = "HH:mm:ss.f";
+
+static string GetCurrentAelinetLocale(Browser browser) => browser.Select("div.lang-wrap > div.lang-cur-wrap > p").Value.Trim();
+
+static void SetCurrentAelinetLocale(Browser browser, Locale locale)
+{
+    switch (locale)
+    {
+        case Locale.EN:
+            browser.Find(ElementType.Anchor, FindBy.Text, "English (United Kingdom)").Click();
+            break;
+        case Locale.DE:
+            browser.Find(ElementType.Anchor, FindBy.Text, "Deutsch (Deutschland)").Click();
+            break;
+        case Locale.FR:
+            browser.Find(ElementType.Anchor, FindBy.Text, "Français (France)").Click();
+            break;
+    }
+}
 
 static readonly Dictionary<string, string> DistortionToShortCodeLookup = new Dictionary<string, string> {
     {"Onslaught of the Sea: Alciona and Melia", "A1"},
@@ -161,8 +194,8 @@ static void SetMemberProfileStats(GuildMember member, Browser masterBrowser)
                         })
                 .ToDictionary(x => x.Stat, x => x.Value, StringComparer.OrdinalIgnoreCase);
 
-    if(stats.ContainsKey("Tactical Sense"))
-    member.TacticalSense = (int)double.Parse(stats["Tactical Sense"]);
+    if (stats.ContainsKey("Tactical Sense"))
+        member.TacticalSense = (int)double.Parse(stats["Tactical Sense"]);
 }
 
 static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> members, Browser masterBrowser, DateTime checkTime, MemberType memberType, bool reportPlayerStatData = false, bool reportDistortionData = false)
@@ -177,7 +210,7 @@ static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> mem
     //THIS TAKES EFFECT ON BOTH TYPES OF MEMBERS
     var skipToPage = 0;
     var upToPage = 0;
-    
+
     browser.Navigate($"https://eu.portal.sf.my.com/guild/{sectionName}/{pantheonId}");
 
     var csrfToken = new Uri(browser.Find(ElementType.Anchor, FindBy.PartialText, "English").GetAttribute("href")).Query.Substring(1).Split('&').First(x => x.StartsWith("csrf_token")).Split('=')[1];
@@ -219,7 +252,7 @@ static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> mem
         members.AddRange(parsedMembers);
 
         if (upToPage > 0 && (nextPage - upToPage + 1 > 0)) break;
-        
+
         nextPage++;
     }
 
@@ -367,6 +400,13 @@ enum MemberType
 {
     PantheonMember,
     AcademyMember
+}
+
+enum Locale
+{
+    EN,
+    DE,
+    FR
 }
 
 class AdventureInfo
