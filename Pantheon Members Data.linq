@@ -13,21 +13,17 @@ void Main()
 
     //Define the region you'd like to work with:
     //Valid options are Region.EU & Region.NA
-    GlobalState.Region = Region.NA;
+    GlobalState.Region = Region.EU;
 
-    //You can either provide login detials below OR use environment variables
-    //SKYFORGE_LOGIN, SKYFORGE_PASSWORD, SKYFORGE_PANTHEONID
-    //to provide them. Login details provided here will override the environrment
+    //You can either provide login details below OR use environment variables
+    //SKYFORGE_LOGIN, SKYFORGE_PASSWORD
+    //to provide them. Login details provided here will override the environment
     //details if present.
 
     //Your username for Alinet portal (this is in email form)
     GlobalState.Username = "";
     //Your password for Aelinet login
     GlobalState.Password = "";
-
-    //You can get this by visiting your pantheon community page in aelinet. It's the last numbers bit in your address bar.
-    //for example for Team Rocket this id is 243083329203608905
-    GlobalState.PantheonId = "";
 
     //Report extended stats for players. Please note that this will significantly increase time to report data if set to true
     //The run time will increase upwards of 4 seconds per Pantheon member (academy members are not parsed for these stats)
@@ -37,55 +33,76 @@ void Main()
     GlobalState.ReportDistortionData = false;
     GlobalState.ReportPlayerProfileData = false;
 
-    var browser = new Browser();
-    var checkTime = DateTime.Now;
-    var members = new List<GuildMember>();
-
     if (CheckAelinetDetailsWithEnvironmentFallback())
     {
-        LoginToAelinet(browser);
-        Locale userLocale = Locale.EN;
+        LoginToAelinet();
+        var userLocale = Locale.EN;
 
         try
         {
-            userLocale = (Locale)Enum.Parse(typeof(Locale), GetCurrentAelinetLocale(browser));
+            userLocale = (Locale)Enum.Parse(typeof(Locale), GetCurrentAelinetLocale());
 
             if (userLocale != Locale.EN)
-                SetCurrentAelinetLocale(browser, Locale.EN);
+                SetCurrentAelinetLocale(Locale.EN);
 
-            NavigateAelinetGuildSection(members, browser, checkTime, MemberType.PantheonMember);
-            NavigateAelinetGuildSection(members, browser, checkTime, MemberType.AcademyMember);
+            NavigateAelinetGuildSection(MemberType.PantheonMember);
+            NavigateAelinetGuildSection(MemberType.AcademyMember);
 
         }
         finally
         {
             if (userLocale != Locale.EN)
-                SetCurrentAelinetLocale(browser, userLocale);
+                SetCurrentAelinetLocale(userLocale);
         }
 
         Util.ClearResults();
-        members.OrderBy(x => x.Name).Dump();
+        GlobalState.Members.OrderBy(x => x.Name).Dump();
     }
 }
 
 const string TimestampFormat = "HH:mm:ss.f";
 
-static string GetCurrentAelinetLocale(Browser browser) => browser.Select("div.lang-wrap > div.lang-cur-wrap > p").Value.Trim();
+static string GetCurrentAelinetLocale() => GlobalState.Browser.Select("div.lang-wrap > div.lang-cur-wrap > p").Value.Trim();
 
-static void SetCurrentAelinetLocale(Browser browser, Locale locale)
+static void SetCurrentAelinetLocale(Locale locale)
 {
     switch (locale)
     {
         case Locale.EN:
-            browser.Find(ElementType.Anchor, FindBy.Text, GlobalState.Region == Region.EU ? "English (United Kingdom)" : "English (United States)").Click();
+            GlobalState.Browser.Find(ElementType.Anchor, FindBy.Text, GlobalState.Region == Region.EU ? "English (United Kingdom)" : "English (United States)").Click();
             break;
         case Locale.DE:
-            browser.Find(ElementType.Anchor, FindBy.Text, "Deutsch (Deutschland)").Click();
+            GlobalState.Browser.Find(ElementType.Anchor, FindBy.Text, "Deutsch (Deutschland)").Click();
             break;
         case Locale.FR:
-            browser.Find(ElementType.Anchor, FindBy.Text, "Français (France)").Click();
+            GlobalState.Browser.Find(ElementType.Anchor, FindBy.Text, "Français (France)").Click();
             break;
     }
+}
+
+static void SetCsrfToken()
+{
+    var match = new Regex("<meta content=\"(.*?)\" name=\"csrf_token\"/>").Match(GlobalState.Browser.CurrentHtml);
+    
+    if (match.Success)
+        GlobalState.CsrfToken = match.Groups[1].Value;
+        
+    else throw new ApplicationException("Unable to determine CSRF Token");
+}
+
+static void SetPantheonId()
+{
+    var browser = GlobalState.Browser.CreateReferenceView();
+
+    browser.Accept = "application/json";
+    browser.SetHeader("X-Requested-With: XMLHttpRequest");
+
+    browser.Navigate(new Uri(GlobalState.BaseAelinetUri, $"/api/game/widgets/widgetsapi:loadData?csrf_token={GlobalState.CsrfToken}"));
+
+    GlobalState.PantheonId = JsonConvert.DeserializeObject<PlayerWidget.PlayerWidgetData>(browser.CurrentHtml).Resp.Guild?.Url.Split('/').Last();
+
+    if (string.IsNullOrWhiteSpace(GlobalState.PantheonId))
+        throw new ApplicationException($"Unable to identify your PantheonId on account {GlobalState.Username}");
 }
 
 static readonly Dictionary<string, string> DistortionToShortCodeLookup = new Dictionary<string, string> {
@@ -108,19 +125,25 @@ static readonly Dictionary<string, string> DistortionToShortCodeLookup = new Dic
     //	{"","D4"},
 };
 
-static void LoginToAelinet(Browser browser)
+static void LoginToAelinet()
 {
     //Use uk english rules for parsing rather than current machine locale
     CultureInfo.CurrentCulture = CultureInfo.CreateSpecificCulture("en-gb");
 
-    browser.Navigate(new Uri(GlobalState.BaseAelinetUri, "/skyforgenews"));
+    GlobalState.Browser.Navigate(new Uri(GlobalState.BaseAelinetUri, "/skyforgenews"));
 
-    if (browser.Find(ElementType.TextField, FindBy.Id, "login") == null) return;
+    if (GlobalState.Browser.Find(ElementType.TextField, FindBy.Id, "login") == null) return;
 
-    browser.Find(ElementType.TextField, FindBy.Id, "login").Value = GlobalState.Username;
-    browser.Find(ElementType.TextField, FindBy.Id, "password").Value = GlobalState.Password;
-    browser.Find(ElementType.Checkbox, FindBy.Id, "remember").Checked = false;
-    browser.Find(ElementType.Button, FindBy.Value, "log in").Click();
+    GlobalState.Browser.Find(ElementType.TextField, FindBy.Id, "login").Value = GlobalState.Username;
+    GlobalState.Browser.Find(ElementType.TextField, FindBy.Id, "password").Value = GlobalState.Password;
+    GlobalState.Browser.Find(ElementType.Checkbox, FindBy.Id, "remember").Checked = false;
+    GlobalState.Browser.Find(ElementType.Button, FindBy.Value, "log in").Click();
+
+    if(!GlobalState.Browser.Url.Query.Contains("auth_result=success"))
+        throw new ApplicationException($"Login failed for {GlobalState.Region} Aelinet portal!");
+
+    SetCsrfToken();
+    SetPantheonId();
 }
 
 static bool CheckAelinetDetailsWithEnvironmentFallback()
@@ -131,25 +154,23 @@ static bool CheckAelinetDetailsWithEnvironmentFallback()
     if (string.IsNullOrWhiteSpace(GlobalState.Password))
         GlobalState.Password = Environment.GetEnvironmentVariable("SKYFORGE_PASSWORD");
 
-    if (string.IsNullOrWhiteSpace(GlobalState.PantheonId))
-        GlobalState.PantheonId = Environment.GetEnvironmentVariable("SKYFORGE_PANTHEONID");
+    if (string.IsNullOrWhiteSpace(GlobalState.Username) || string.IsNullOrWhiteSpace(GlobalState.Password))
+        throw new ApplicationException("Please enter all the required form fields: username, password.");
 
-    if (!string.IsNullOrWhiteSpace(GlobalState.Username) && !string.IsNullOrWhiteSpace(GlobalState.Password) && !string.IsNullOrWhiteSpace(GlobalState.PantheonId)) return true;
-
-    throw new ApplicationException("Please enter all the required form fields: username, password, pantheonId.");
+    return true;
 }
 
-static void SetMemberDistortions(GuildMember member, Browser masterBrowser, string csrfToken)
+static void SetMemberDistortions(GuildMember member)
 {
-    var browser = masterBrowser.CreateReferenceView();
+    var browser = GlobalState.Browser.CreateReferenceView();
 
     browser.Accept = "application/json";
     browser.SetHeader("X-Requested-With: XMLHttpRequest");
 
-    browser.Navigate(new Uri(GlobalState.BaseAelinetUri, $"/api/game/stats/StatsApi:getAvatarStats/{member.MemberId}?csrf_token={csrfToken}"));
+    browser.Navigate(new Uri(GlobalState.BaseAelinetUri, $"/api/game/stats/StatsApi:getAvatarStats/{member.MemberId}?csrf_token={GlobalState.CsrfToken}"));
 
-    var distortions = JsonConvert.DeserializeObject<RootObject>(browser.CurrentHtml).adventureStats.byAdventureStats.Where(x => x.rule.types.Contains(RuleTypes.RULE_TYPE_PVE) && x.rule.types.Contains(RuleTypes.RULE_TYPE_DIMENSION))
-                            .Select(x => new AdventureInfo { AdventureType = AdventureType.Distortion, CompletionCount = int.Parse(x.completionsCount), Name = x.rule.name.Trim(' ', '.') }).ToArray();
+    var distortions = JsonConvert.DeserializeObject<DungeonStatsData.AvatarStatisticsData>(browser.CurrentHtml).AdventureStats.ByAdventureStats.Where(x => x.Rule.Types.Contains(DungeonStatsData.RuleTypes.RULE_TYPE_PVE) && x.Rule.Types.Contains(DungeonStatsData.RuleTypes.RULE_TYPE_DIMENSION))
+                            .Select(x => new AdventureInfo { AdventureType = AdventureType.Distortion, CompletionCount = int.Parse(x.CompletionsCount), Name = x.Rule.Name.Trim(' ', '.') }).ToArray();
 
     foreach (var distortion in distortions.Where(x => DistortionToShortCodeLookup.ContainsKey(x.Name.Replace(" (Rated)", string.Empty).Trim())))
         distortion.ShortCode = DistortionToShortCodeLookup[distortion.Name.Replace(" (Rated)", string.Empty).Trim()] + (distortion.IsRated ? "R" : string.Empty);
@@ -180,9 +201,9 @@ static void SetMemberDistortions(GuildMember member, Browser masterBrowser, stri
     member.C4R = distortions.SingleOrDefault(d => d.ShortCode == nameof(member.C4R))?.CompletionCount ?? 0;
 }
 
-static void SetMemberProfileStats(GuildMember member, Browser masterBrowser)
+static void SetMemberProfileStats(GuildMember member)
 {
-    var browser = masterBrowser.CreateReferenceView();
+    var browser = GlobalState.Browser.CreateReferenceView();
 
     browser.Navigate(new Uri(GlobalState.BaseAelinetUri, $"/user/avatar/{member.MemberId}"));
 
@@ -201,9 +222,9 @@ static void SetMemberProfileStats(GuildMember member, Browser masterBrowser)
         member.TacticalSense = (int)double.Parse(stats["Tactical Sense"]);
 }
 
-static void NavigateAelinetGuildSection(List<GuildMember> members, Browser masterBrowser, DateTime checkTime, MemberType memberType)
+static void NavigateAelinetGuildSection(MemberType memberType)
 {
-    var browser = masterBrowser.CreateReferenceView();
+    var browser = GlobalState.Browser.CreateReferenceView();
     var sectionName = memberType == MemberType.PantheonMember ? "members" : "academy";
     var backgroundTasks = new List<Task>();
     GuildMember[] parsedMembers;
@@ -223,10 +244,10 @@ static void NavigateAelinetGuildSection(List<GuildMember> members, Browser maste
     //Handle the landing page (1st page)
     if (skipToPage < 2)
     {
-        parsedMembers = ParseGuildMembers(browser.XDocument.Root, checkTime, memberType).ToArray();
-        backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType, browser, csrfToken));
+        parsedMembers = ParseGuildMembers(browser.XDocument.Root, memberType).ToArray();
+        backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType));
 
-        members.AddRange(parsedMembers);
+        GlobalState.Members.AddRange(parsedMembers);
     }
 
     XElement nextLink;
@@ -250,9 +271,9 @@ static void NavigateAelinetGuildSection(List<GuildMember> members, Browser maste
             continue;
         }
 
-        parsedMembers = ParseGuildMembers(browser.XDocument.Root, checkTime, memberType).ToArray();
-        backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType, browser, csrfToken));
-        members.AddRange(parsedMembers);
+        parsedMembers = ParseGuildMembers(browser.XDocument.Root, memberType).ToArray();
+        backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType));
+        GlobalState.Members.AddRange(parsedMembers);
 
         if (upToPage > 0 && (nextPage - upToPage + 1 > 0)) break;
 
@@ -262,7 +283,7 @@ static void NavigateAelinetGuildSection(List<GuildMember> members, Browser maste
     Task.WaitAll(backgroundTasks.ToArray());
 }
 
-static IEnumerable<Task> SetMemberStats(IEnumerable<GuildMember> members, MemberType memberType, Browser browser, string csrfToken)
+static IEnumerable<Task> SetMemberStats(IEnumerable<GuildMember> members, MemberType memberType)
 {
     //ticks here get truncated in value but irrelevant for the purpose of seed;
     var fudger = new Random((int)DateTime.Now.Ticks);
@@ -276,22 +297,21 @@ static IEnumerable<Task> SetMemberStats(IEnumerable<GuildMember> members, Member
             yield return Task.Run(() =>
             {
                 if (GlobalState.ReportDistortionData)
-                    SetMemberDistortions(member, browser, csrfToken);
+                    SetMemberDistortions(member);
             })
             .ContinueWith(_ =>
             {
                 if (GlobalState.ReportPlayerProfileData)
-                    SetMemberProfileStats(member, browser);
+                    SetMemberProfileStats(member);
             });
         }
 }
 
-static IEnumerable<GuildMember> ParseGuildMembers(XElement documentRoot, DateTime checkTime, MemberType memberType)
+static IEnumerable<GuildMember> ParseGuildMembers(XElement documentRoot, MemberType memberType)
 {
     return documentRoot.XPathSelectElements("//div[@class=\"guild-member\"]/div/div").OfType<XElement>().Select(x => new
     {
         DocumentRoot = x,
-        CheckTime = checkTime,
         Prestige = (int)GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(0).Value),
         CreditsDonated = GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(1).Value),
         MaterialsDonated = (int)GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(2).Value),
@@ -303,7 +323,7 @@ static IEnumerable<GuildMember> ParseGuildMembers(XElement documentRoot, DateTim
     })
     .Select(x => new GuildMember
     {
-        CheckTime = checkTime,
+        CheckTime = GlobalState.CheckTime,
         Prestige = x.Prestige,
         CreditsDonated = x.CreditsDonated,
         MaterialsDonated = x.MaterialsDonated,
@@ -399,6 +419,30 @@ public class GuildMember
     public int D4R { get; set; }
 }
 
+public static class GlobalState
+{
+    public static string Username { get; set; }
+    public static string Password { get; set; }
+    public static Region Region { get; set; }
+    public static string PantheonId { get; set; }
+    public static bool ReportDistortionData { get; set; }
+    public static bool ReportPlayerProfileData { get; set; }
+    public static Uri BaseAelinetUri => Region == Region.EU ? new Uri("https://eu.portal.sf.my.com") : new Uri("https://na.portal.sf.my.com");
+    public static string CsrfToken { get; set; }
+    public static Browser Browser { get; } = new Browser();
+    public static List<GuildMember> Members { get; } = new List<GuildMember>();
+    public static DateTime CheckTime { get; } = DateTime.Now;
+}
+
+public class AdventureInfo
+{
+    public string ShortCode { get; set; }
+    public string Name { get; set; }
+    public AdventureType AdventureType { get; set; }
+    public int CompletionCount { get; set; }
+    public bool IsRated => !string.IsNullOrEmpty(Name) && Name.EndsWith("(Rated)");
+}
+
 public enum MemberType
 {
     PantheonMember,
@@ -418,26 +462,6 @@ public enum Region
     NA
 }
 
-public static class GlobalState
-{
-    public static string Username { get; set; }
-    public static string Password { get; set; }
-    public static Region Region { get; set; }
-    public static string PantheonId { get; set; }
-    public static bool ReportDistortionData { get; set; }
-    public static bool ReportPlayerProfileData { get; set; }
-    public static Uri BaseAelinetUri => Region == Region.EU ? new Uri("https://eu.portal.sf.my.com") : new Uri("https://na.portal.sf.my.com");
-}
-
-public class AdventureInfo
-{
-    public string ShortCode { get; set; }
-    public string Name { get; set; }
-    public AdventureType AdventureType { get; set; }
-    public int CompletionCount { get; set; }
-    public bool IsRated => !string.IsNullOrEmpty(Name) && Name.EndsWith("(Rated)");
-}
-
 public enum AdventureType
 {
     Squad,
@@ -447,148 +471,418 @@ public enum AdventureType
     Avatar
 }
 
+#endregion
+
 #region Json2CSharp classes
 // ReSharper disable InconsistentNaming
 // ReSharper disable ClassNeverInstantiated.Global
-public enum RuleTypes
+public class DungeonStatsData
 {
-    RULE_TYPE_AIR, //No idea what this is
-    RULE_TYPE_DIMENSION, //Distortion
-    RULE_TYPE_SOLO, //Squad
-    RULE_TYPE_GROUP,
-    RULE_TYPE_PVE,
-    RULE_TYPE_PVP,
-    RULE_TYPE_DROP_SHIP, //Invasion missions including training avatar
-    RULE_TYPE_CUBE, //Training stuff?
-    RULE_TYPE_RIFT //Champion
+    public class AllDaysStats
+    {
+
+        [JsonProperty("pvpDeaths")]
+        public string PvpDeaths { get; set; }
+
+        [JsonProperty("pveBossKills")]
+        public string PveBossKills { get; set; }
+
+        [JsonProperty("pveMobKills")]
+        public string PveMobKills { get; set; }
+
+        [JsonProperty("pvpKills")]
+        public string PvpKills { get; set; }
+
+        [JsonProperty("pvpAssists")]
+        public string PvpAssists { get; set; }
+
+        [JsonProperty("pveDeaths")]
+        public string PveDeaths { get; set; }
+    }
+
+    public class DailyStat
+    {
+
+        [JsonProperty("pvpDeaths")]
+        public string PvpDeaths { get; set; }
+
+        [JsonProperty("pveBossKills")]
+        public string PveBossKills { get; set; }
+
+        [JsonProperty("pveMobKills")]
+        public string PveMobKills { get; set; }
+
+        [JsonProperty("pvpKills")]
+        public string PvpKills { get; set; }
+
+        [JsonProperty("pvpAssists")]
+        public string PvpAssists { get; set; }
+
+        [JsonProperty("pveDeaths")]
+        public string PveDeaths { get; set; }
+    }
+
+    public class PvpStats
+    {
+
+        [JsonProperty("skill")]
+        public double Skill { get; set; }
+
+        [JsonProperty("ratingGamesCount")]
+        public int RatingGamesCount { get; set; }
+    }
+
+    public class CharacterClass
+    {
+
+        [JsonProperty("resourceId")]
+        public int ResourceId { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("imageSrc")]
+        public string ImageSrc { get; set; }
+    }
+
+    public class Stats
+    {
+
+        [JsonProperty("pvpDeaths")]
+        public string PvpDeaths { get; set; }
+
+        [JsonProperty("pveBossKills")]
+        public string PveBossKills { get; set; }
+
+        [JsonProperty("pveMobKills")]
+        public string PveMobKills { get; set; }
+
+        [JsonProperty("pvpKills")]
+        public string PvpKills { get; set; }
+
+        [JsonProperty("pvpAssists")]
+        public string PvpAssists { get; set; }
+
+        [JsonProperty("pveDeaths")]
+        public string PveDeaths { get; set; }
+    }
+
+    public class ClassStat
+    {
+
+        [JsonProperty("characterClass")]
+        public CharacterClass CharacterClass { get; set; }
+
+        [JsonProperty("stats")]
+        public Stats Stats { get; set; }
+
+        [JsonProperty("secondsPlayed")]
+        public string SecondsPlayed { get; set; }
+
+        [JsonProperty("secondsActivePlayed")]
+        public string SecondsActivePlayed { get; set; }
+    }
+
+    public class AvatarStats
+    {
+
+        [JsonProperty("trueSkillMultiplier")]
+        public int TrueSkillMultiplier { get; set; }
+
+        [JsonProperty("ratingGamesTreshold")]
+        public int RatingGamesTreshold { get; set; }
+
+        [JsonProperty("secondsPlayed")]
+        public string SecondsPlayed { get; set; }
+
+        [JsonProperty("allDaysStats")]
+        public AllDaysStats AllDaysStats { get; set; }
+
+        [JsonProperty("dailyStats")]
+        public IList<DailyStat> DailyStats { get; set; }
+
+        [JsonProperty("daysToShow")]
+        public string DaysToShow { get; set; }
+
+        [JsonProperty("pvpStats")]
+        public PvpStats PvpStats { get; set; }
+
+        [JsonProperty("classStats")]
+        public IList<ClassStat> ClassStats { get; set; }
+
+        [JsonProperty("secondsActivePlayed")]
+        public string SecondsActivePlayed { get; set; }
+
+        [JsonProperty("timestamp")]
+        public long Timestamp { get; set; }
+    }
+
+    public class AdventureTypes
+    {
+
+        [JsonProperty("dimension_type")]
+        public string DimensionType { get; set; }
+
+        [JsonProperty("air_type")]
+        public string AirType { get; set; }
+
+        [JsonProperty("solo_type")]
+        public string SoloType { get; set; }
+
+        [JsonProperty("pve_type")]
+        public string PveType { get; set; }
+
+        [JsonProperty("group_type")]
+        public string GroupType { get; set; }
+
+        [JsonProperty("pvp_type")]
+        public string PvpType { get; set; }
+    }
+
+    public class Medal
+    {
+
+        [JsonProperty("medalCount")]
+        public string MedalCount { get; set; }
+
+        [JsonProperty("medalKind")]
+        public string MedalKind { get; set; }
+    }
+
+    public class Rule
+    {
+
+        [JsonProperty("image")]
+        public string Image { get; set; }
+
+        [JsonProperty("types")]
+        public IList<RuleTypes> Types { get; set; }
+
+        [JsonProperty("resourceId")]
+        public int ResourceId { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
+    }
+
+    public class ByAdventureStat
+    {
+
+        [JsonProperty("failtureCount")]
+        public string FailtureCount { get; set; }
+
+        [JsonProperty("bestLadderRatingGrade")]
+        public string BestLadderRatingGrade { get; set; }
+
+        [JsonProperty("medals")]
+        public IList<Medal> Medals { get; set; }
+
+        [JsonProperty("bestLadderRating")]
+        public string BestLadderRating { get; set; }
+
+        [JsonProperty("timeSpent")]
+        public string TimeSpent { get; set; }
+
+        [JsonProperty("bestScore")]
+        public string BestScore { get; set; }
+
+        [JsonProperty("bestLadderTimeGrade")]
+        public string BestLadderTimeGrade { get; set; }
+
+        [JsonProperty("pvpWins")]
+        public string PvpWins { get; set; }
+
+        [JsonProperty("rule")]
+        public Rule Rule { get; set; }
+
+        [JsonProperty("bestLadderTime")]
+        public string BestLadderTime { get; set; }
+
+        [JsonProperty("completionsCount")]
+        public string CompletionsCount { get; set; }
+    }
+
+    public class AdventureStats
+    {
+
+        [JsonProperty("encyclopediaLink")]
+        public string EncyclopediaLink { get; set; }
+
+        [JsonProperty("adventureTypes")]
+        public AdventureTypes AdventureTypes { get; set; }
+
+        [JsonProperty("byAdventureStats")]
+        public IList<ByAdventureStat> ByAdventureStats { get; set; }
+    }
+
+    public class Switchers
+    {
+
+        [JsonProperty("adventureStatsEnabled")]
+        public bool AdventureStatsEnabled { get; set; }
+
+        [JsonProperty("displayTrueSkill")]
+        public bool DisplayTrueSkill { get; set; }
+    }
+
+    public class AvatarStatisticsData
+    {
+
+        [JsonProperty("avatarStats")]
+        public AvatarStats AvatarStats { get; set; }
+
+        [JsonProperty("adventureStats")]
+        public AdventureStats AdventureStats { get; set; }
+
+        [JsonProperty("switchers")]
+        public Switchers Switchers { get; set; }
+    }
+
+    public enum RuleTypes
+    {
+        RULE_TYPE_AIR, //No idea what this is
+        RULE_TYPE_DIMENSION, //Distortion
+        RULE_TYPE_SOLO, //Squad
+        RULE_TYPE_GROUP,
+        RULE_TYPE_PVE,
+        RULE_TYPE_PVP,
+        RULE_TYPE_DROP_SHIP, //Invasion missions including training avatar
+        RULE_TYPE_CUBE, //Training stuff?
+        RULE_TYPE_RIFT //Champion
+    }
 }
 
-public class DailyStat
+public class PlayerWidget
 {
-    public string pvpDeaths { get; set; }
-    public string pveBossKills { get; set; }
-    public string pveMobKills { get; set; }
-    public string pvpAssists { get; set; }
-    public string pvpKills { get; set; }
-    public string pveDeaths { get; set; }
+    public class Guild
+    {
+
+        [JsonProperty("guildRight")]
+        public string GuildRight { get; set; }
+
+        [JsonProperty("guildPicUrl")]
+        public string GuildPicUrl { get; set; }
+
+        [JsonProperty("url")]
+        public string Url { get; set; }
+
+        [JsonProperty("guildName")]
+        public string GuildName { get; set; }
+    }
+
+    public class WidStats
+    {
+
+        [JsonProperty("dailyCalculatedTrueSkill")]
+        public double DailyCalculatedTrueSkill { get; set; }
+
+        [JsonProperty("ratingGamesThreshold")]
+        public int RatingGamesThreshold { get; set; }
+
+        [JsonProperty("skill")]
+        public double Skill { get; set; }
+
+        [JsonProperty("ratingGamesCount")]
+        public int RatingGamesCount { get; set; }
+
+        [JsonProperty("dailyRatingGamesCount")]
+        public int DailyRatingGamesCount { get; set; }
+
+        [JsonProperty("url")]
+        public string Url { get; set; }
+    }
+
+    public class Avatar
+    {
+
+        [JsonProperty("avatarName")]
+        public string AvatarName { get; set; }
+
+        [JsonProperty("classImageUrl")]
+        public string ClassImageUrl { get; set; }
+
+        [JsonProperty("prestige")]
+        public int Prestige { get; set; }
+
+        [JsonProperty("url")]
+        public string Url { get; set; }
+    }
+
+    public class User
+    {
+
+        [JsonProperty("userPicUrl")]
+        public string UserPicUrl { get; set; }
+
+        [JsonProperty("nickName")]
+        public string NickName { get; set; }
+
+        [JsonProperty("url")]
+        public string Url { get; set; }
+    }
+
+    public class Friends
+    {
+
+        [JsonProperty("communitiesCount")]
+        public int CommunitiesCount { get; set; }
+
+        [JsonProperty("friendsCount")]
+        public int FriendsCount { get; set; }
+
+        [JsonProperty("url")]
+        public string Url { get; set; }
+    }
+
+    public class Stats
+    {
+        [JsonProperty("allAdventuresCompletionsCount")]
+        public string AllAdventuresCompletionsCount { get; set; }
+
+        [JsonProperty("ratingGamesTreshold")]
+        public int RatingGamesTreshold { get; set; }
+
+        [JsonProperty("dailyCalculatedTrueSkill")]
+        public double DailyCalculatedTrueSkill { get; set; }
+
+        [JsonProperty("allDaysStats")]
+        public DungeonStatsData.AllDaysStats AllDaysStats { get; set; }
+
+        [JsonProperty("allAdventuresFailureCount")]
+        public string AllAdventuresFailureCount { get; set; }
+
+        [JsonProperty("pvpStats")]
+        public DungeonStatsData.PvpStats PvpStats { get; set; }
+    }
+
+    public class Resp
+    {
+
+        [JsonProperty("guild")]
+        public Guild Guild { get; set; }
+
+        [JsonProperty("stats")]
+        public Stats Stats { get; set; }
+
+        [JsonProperty("avatar")]
+        public Avatar Avatar { get; set; }
+
+        [JsonProperty("user")]
+        public User User { get; set; }
+
+        [JsonProperty("friends")]
+        public Friends Friends { get; set; }
+    }
+
+    public class PlayerWidgetData
+    {
+        [JsonProperty("resp")]
+        public Resp Resp { get; set; }
+    }
 }
 
-public class AllDaysStats
-{
-    public string pvpDeaths { get; set; }
-    public string pveBossKills { get; set; }
-    public string pveMobKills { get; set; }
-    public string pvpAssists { get; set; }
-    public string pvpKills { get; set; }
-    public string pveDeaths { get; set; }
-}
-
-public class PvpStats
-{
-    public double skill { get; set; }
-    public int ratingGamesCount { get; set; }
-}
-
-public class Stats
-{
-    public string pvpDeaths { get; set; }
-    public string pveBossKills { get; set; }
-    public string pveMobKills { get; set; }
-    public string pvpAssists { get; set; }
-    public string pvpKills { get; set; }
-    public string pveDeaths { get; set; }
-}
-
-public class CharacterClass
-{
-    public int resourceId { get; set; }
-    public string name { get; set; }
-    public string imageSrc { get; set; }
-}
-
-public class ClassStat
-{
-    public Stats stats { get; set; }
-    public CharacterClass characterClass { get; set; }
-    public string secondsPlayed { get; set; }
-    public string secondsActivePlayed { get; set; }
-}
-
-public class AvatarStats
-{
-    public int trueSkillMultiplier { get; set; }
-    public int ratingGamesTreshold { get; set; }
-    public DailyStat[] dailyStats { get; set; }
-    public AllDaysStats allDaysStats { get; set; }
-    public string secondsPlayed { get; set; }
-    public string daysToShow { get; set; }
-    public PvpStats pvpStats { get; set; }
-    public ClassStat[] classStats { get; set; }
-    public string secondsActivePlayed { get; set; }
-    public long timestamp { get; set; }
-}
-
-public class AdventureTypes
-{
-    public string dimension_type { get; set; }
-    public string air_type { get; set; }
-    public string solo_type { get; set; }
-    public string pve_type { get; set; }
-    public string group_type { get; set; }
-    public string pvp_type { get; set; }
-}
-
-public class Rule
-{
-    public string image { get; set; }
-    public RuleTypes[] types { get; set; }
-    public int resourceId { get; set; }
-    public string name { get; set; }
-}
-
-public class Medal
-{
-    public int medalCount { get; set; }
-    public string medalKind { get; set; }
-}
-
-public class ByAdventureStat
-{
-    public string failtureCount { get; set; }
-    public string bestLadderRatingGrade { get; set; }
-    public Medal[] medals { get; set; }
-    public string bestLadderRating { get; set; }
-    public string timeSpent { get; set; }
-    public string bestScore { get; set; }
-    public string bestLadderTimeGrade { get; set; }
-    public string pvpWins { get; set; }
-    public Rule rule { get; set; }
-    public string completionsCount { get; set; }
-    public string bestLadderTime { get; set; }
-}
-
-public class AdventureStats
-{
-    public string encyclopediaLink { get; set; }
-    public AdventureTypes adventureTypes { get; set; }
-    public ByAdventureStat[] byAdventureStats { get; set; }
-}
-
-public class Switchers
-{
-    public bool adventureStatsEnabled { get; set; }
-    public bool displayTrueSkill { get; set; }
-}
-
-public class RootObject
-{
-    public AvatarStats avatarStats { get; set; }
-    public AdventureStats adventureStats { get; set; }
-    public Switchers switchers { get; set; }
-}
 // ReSharper restore ClassNeverInstantiated.Global
 // ReSharper restore InconsistentNaming
 // ReSharper restore MemberCanBePrivate.Global
 // ReSharper restore UnusedAutoPropertyAccessor.Global
-#endregion
 #endregion
