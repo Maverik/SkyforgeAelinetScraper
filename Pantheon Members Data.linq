@@ -83,10 +83,10 @@ static void SetCurrentAelinetLocale(Locale locale)
 static void SetCsrfToken()
 {
     var match = new Regex("<meta content=\"(.*?)\" name=\"csrf_token\"/>").Match(GlobalState.Browser.CurrentHtml);
-    
+
     if (match.Success)
         GlobalState.CsrfToken = match.Groups[1].Value;
-        
+
     else throw new ApplicationException("Unable to determine CSRF Token");
 }
 
@@ -139,7 +139,7 @@ static void LoginToAelinet()
     GlobalState.Browser.Find(ElementType.Checkbox, FindBy.Id, "remember").Checked = false;
     GlobalState.Browser.Find(ElementType.Button, FindBy.Value, "log in").Click();
 
-    if(!GlobalState.Browser.Url.Query.Contains("auth_result=success"))
+    if (!GlobalState.Browser.Url.Query.Contains("auth_result=success"))
         throw new ApplicationException($"Login failed for {GlobalState.Region} Aelinet portal!");
 
     SetCsrfToken();
@@ -244,19 +244,19 @@ static void NavigateAelinetGuildSection(MemberType memberType)
     //Handle the landing page (1st page)
     if (skipToPage < 2)
     {
-        parsedMembers = ParseGuildMembers(browser.XDocument.Root, memberType).ToArray();
+        parsedMembers = ParseGuildMembers(browser, memberType).ToArray();
         backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType));
 
         GlobalState.Members.AddRange(parsedMembers);
     }
 
-    XElement nextLink;
-    while ((nextLink = browser.XDocument.Root.XPathSelectElement($"//div[@class=\"paging\"]/a[text()={nextPage}]")) != null)
+    HtmlResult nextPageAnchor;
+    while ((nextPageAnchor = browser.Select("div.paging-alt > div.paging-wrap > a.paging-control.paging-next")).Exists)
     {
         Util.ClearResults();
         string.Format("{0} Processing Page {1} for {2}...", DateTime.Now.ToString(TimestampFormat), nextPage, memberType == MemberType.PantheonMember ? "pantheon members" : "academy members").Dump();
 
-        var link = nextLink.Attribute("href").Value;
+        var link = nextPageAnchor.GetAttribute("href");
         browser.SetHeader("X-Requested-With: XMLHttpRequest");
         browser.SetHeader("X-Prototype-Version: 1.7");
         browser.Accept = "text/javascript, text/html, application/xml, text/xml, */*";
@@ -271,7 +271,7 @@ static void NavigateAelinetGuildSection(MemberType memberType)
             continue;
         }
 
-        parsedMembers = ParseGuildMembers(browser.XDocument.Root, memberType).ToArray();
+        parsedMembers = ParseGuildMembers(browser, memberType).ToArray();
         backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType));
         GlobalState.Members.AddRange(parsedMembers);
 
@@ -307,35 +307,26 @@ static IEnumerable<Task> SetMemberStats(IEnumerable<GuildMember> members, Member
         }
 }
 
-static IEnumerable<GuildMember> ParseGuildMembers(XElement documentRoot, MemberType memberType)
+static IEnumerable<GuildMember> ParseGuildMembers(Browser browser, MemberType memberType)
 {
-    return documentRoot.XPathSelectElements("//div[@class=\"guild-member\"]/div/div").OfType<XElement>().Select(x => new
-    {
-        DocumentRoot = x,
-        Prestige = (int)GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(0).Value),
-        CreditsDonated = GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(1).Value),
-        MaterialsDonated = (int)GetNumberInLong(x.XPathSelectElements(".//div[@class=\"guild-member-td-c\"]/p").ElementAt(2).Value),
-        ImageUrl = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div/a/div/img").Attribute("src").Value,
-        IsGod = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div").Attribute("class").Value.Contains("set-godness"),
-        IsPremium = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div").Attribute("class").Value.Contains("set-premium"),
-        IsOnline = x.XPathSelectElement(".//div[@class=\"guild-member-td-b\"]/div/div").Attribute("class").Value.Contains("set-ingame"),
-        IsBanned = x.XPathSelectElement(".//div[@class=\"ubox-name\"]/*/span[@class=\"crossed-out b-tip\"]") != null,
-    })
-    .Select(x => new GuildMember
+
+    return browser.Select("div.guild-member").Select(x => new GuildMember
     {
         CheckTime = GlobalState.CheckTime,
-        Prestige = x.Prestige,
-        CreditsDonated = x.CreditsDonated,
-        MaterialsDonated = x.MaterialsDonated,
-        ImageUrl = x.ImageUrl[0] == '/' ? new Uri(GlobalState.BaseAelinetUri, x.ImageUrl).ToString() : x.ImageUrl,
-        IsGod = x.IsGod,
-        IsPremium = x.IsPremium,
-        IsOnline = x.IsOnline,
-        IsBanned = x.IsBanned,
-        Name = x.IsBanned ? x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-name\"]/*/span[@class=\"crossed-out b-tip\"]").Value.Trim()
-            : x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-name\"]/span/a").Value.Trim(),
-        ProfileUrl = x.IsBanned ? x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-title\"]/a").Attribute("href").Value
-            : x.DocumentRoot.XPathSelectElement(".//div[@class=\"ubox-name\"]/span/a").Attribute("href").Value,
+        Prestige = (int)GetNumberInLong(x.Select("div.guild-member-td-c > p").ElementAt(0).Value),
+        CreditsDonated = GetNumberInLong(x.Select("div.guild-member-td-c > p").ElementAt(1).Value),
+        MaterialsDonated = (int)GetNumberInLong(x.Select("div.guild-member-td-c > p").ElementAt(2).Value),
+        ImageUrl = x.Select("div.guild-member-td-b > div.ubox div.upic-img > img").GetAttribute("src").StartsWith("/") ?
+            new Uri(GlobalState.BaseAelinetUri, x.Select("div.guild-member-td-b > div.ubox div.upic-img > img").GetAttribute("src")).ToString() :
+            x.Select("div.guild-member-td-b > div.ubox div.upic-img > img").GetAttribute("src"),
+        IsGod = x.Select("div.guild-member-td-b > div.ubox > div.set-godness").Exists,
+        IsPremium = x.Select("div.guild-member-td-b > div.ubox > div.set-premium").Exists,
+        IsOnline = x.Select("div.guild-member-td-b > div.ubox > div.set-ingame").Exists,
+        IsBanned = x.Select("div.guild-member-td-b > div.ubox div.ubox-name > span > span.crossed-out").Exists,
+        Name = x.Select("div.guild-member-td-b > div.ubox .ubox-name > span > a").Exists ?
+                x.Select("div.guild-member-td-b > div.ubox .ubox-name > span > a").Value.Trim() :
+                x.Select("div.guild-member-td-b > div.ubox .ubox-title > a").Value.Trim(),
+        ProfileUrl = x.Select("div.guild-member-td-b > div.ubox .ubox-title > a").GetAttribute("href"),
         MemberType = memberType
     });
 }
