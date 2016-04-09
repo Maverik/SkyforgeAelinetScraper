@@ -11,35 +11,39 @@
 void Main()
 {
 
+    //Define the region you'd like to work with:
+    //Valid options are Region.EU & Region.NA
+    GlobalState.Region = Region.NA;
+
     //You can either provide login detials below OR use environment variables
     //SKYFORGE_LOGIN, SKYFORGE_PASSWORD, SKYFORGE_PANTHEONID
     //to provide them. Login details provided here will override the environrment
     //details if present.
 
     //Your username for Alinet portal (this is in email form)
-    var username = "";
+    GlobalState.Username = "";
     //Your password for Aelinet login
-    var password = "";
+    GlobalState.Password = "";
 
     //You can get this by visiting your pantheon community page in aelinet. It's the last numbers bit in your address bar.
     //for example for Team Rocket this id is 243083329203608905
-    var pantheonId = "";
+    GlobalState.PantheonId = "";
 
     //Report extended stats for players. Please note that this will significantly increase time to report data if set to true
     //The run time will increase upwards of 4 seconds per Pantheon member (academy members are not parsed for these stats)
     //Please do not fiddle with 4 seconds to make things any faster unless you take responsibility for possibly getting banned
     //for abusing this tool or any other sanctions that may be applied to you and anybody else in pantheon by official customer support
     //YOU HAVE BEEN WARNED!
-    var reportDistortionData = false;
-    var reportPlayerProfileData = false;
+    GlobalState.ReportDistortionData = false;
+    GlobalState.ReportPlayerProfileData = false;
 
     var browser = new Browser();
     var checkTime = DateTime.Now;
     var members = new List<GuildMember>();
 
-    if (CheckAelinetDetailsWithEnvironmentFallback(ref username, ref password, ref pantheonId))
+    if (CheckAelinetDetailsWithEnvironmentFallback())
     {
-        LoginToAelinet(browser, username, password);
+        LoginToAelinet(browser);
         Locale userLocale = Locale.EN;
 
         try
@@ -49,8 +53,8 @@ void Main()
             if (userLocale != Locale.EN)
                 SetCurrentAelinetLocale(browser, Locale.EN);
 
-            NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.PantheonMember, reportPlayerProfileData, reportDistortionData);
-            NavigateAelinetGuildSection(pantheonId, members, browser, checkTime, MemberType.AcademyMember);
+            NavigateAelinetGuildSection(members, browser, checkTime, MemberType.PantheonMember);
+            NavigateAelinetGuildSection(members, browser, checkTime, MemberType.AcademyMember);
 
         }
         finally
@@ -73,7 +77,7 @@ static void SetCurrentAelinetLocale(Browser browser, Locale locale)
     switch (locale)
     {
         case Locale.EN:
-            browser.Find(ElementType.Anchor, FindBy.Text, "English (United Kingdom)").Click();
+            browser.Find(ElementType.Anchor, FindBy.Text, GlobalState.Region == Region.EU ? "English (United Kingdom)" : "English (United States)").Click();
             break;
         case Locale.DE:
             browser.Find(ElementType.Anchor, FindBy.Text, "Deutsch (Deutschland)").Click();
@@ -104,36 +108,35 @@ static readonly Dictionary<string, string> DistortionToShortCodeLookup = new Dic
     //	{"","D4"},
 };
 
-static void LoginToAelinet(Browser browser, string username, string password)
+static void LoginToAelinet(Browser browser)
 {
     //Use uk english rules for parsing rather than current machine locale
     CultureInfo.CurrentCulture = CultureInfo.CreateSpecificCulture("en-gb");
 
-    browser.Navigate($"https://eu.portal.sf.my.com/skyforgenews");
+    browser.Navigate(new Uri(GlobalState.BaseAelinetUri, "/skyforgenews"));
 
     if (browser.Find(ElementType.TextField, FindBy.Id, "login") == null) return;
 
-    browser.Find(ElementType.TextField, FindBy.Id, "login").Value = username;
-    browser.Find(ElementType.TextField, FindBy.Id, "password").Value = password;
+    browser.Find(ElementType.TextField, FindBy.Id, "login").Value = GlobalState.Username;
+    browser.Find(ElementType.TextField, FindBy.Id, "password").Value = GlobalState.Password;
     browser.Find(ElementType.Checkbox, FindBy.Id, "remember").Checked = false;
     browser.Find(ElementType.Button, FindBy.Value, "log in").Click();
 }
 
-static bool CheckAelinetDetailsWithEnvironmentFallback(ref string username, ref string password, ref string pantheonId)
+static bool CheckAelinetDetailsWithEnvironmentFallback()
 {
-    if (string.IsNullOrWhiteSpace(username))
-        username = Environment.GetEnvironmentVariable("SKYFORGE_LOGIN");
+    if (string.IsNullOrWhiteSpace(GlobalState.Username))
+        GlobalState.Username = Environment.GetEnvironmentVariable("SKYFORGE_LOGIN");
 
-    if (string.IsNullOrWhiteSpace(password))
-        password = Environment.GetEnvironmentVariable("SKYFORGE_PASSWORD");
+    if (string.IsNullOrWhiteSpace(GlobalState.Password))
+        GlobalState.Password = Environment.GetEnvironmentVariable("SKYFORGE_PASSWORD");
 
-    if (string.IsNullOrWhiteSpace(pantheonId))
-        pantheonId = Environment.GetEnvironmentVariable("SKYFORGE_PANTHEONID");
+    if (string.IsNullOrWhiteSpace(GlobalState.PantheonId))
+        GlobalState.PantheonId = Environment.GetEnvironmentVariable("SKYFORGE_PANTHEONID");
 
-    if (!string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password) && !string.IsNullOrWhiteSpace(pantheonId)) return true;
+    if (!string.IsNullOrWhiteSpace(GlobalState.Username) && !string.IsNullOrWhiteSpace(GlobalState.Password) && !string.IsNullOrWhiteSpace(GlobalState.PantheonId)) return true;
 
-    "Please enter all the required form fields: username, password, pantheonId.".Dump("ERROR");
-    return false;
+    throw new ApplicationException("Please enter all the required form fields: username, password, pantheonId.");
 }
 
 static void SetMemberDistortions(GuildMember member, Browser masterBrowser, string csrfToken)
@@ -143,7 +146,7 @@ static void SetMemberDistortions(GuildMember member, Browser masterBrowser, stri
     browser.Accept = "application/json";
     browser.SetHeader("X-Requested-With: XMLHttpRequest");
 
-    browser.Navigate($"https://eu.portal.sf.my.com/api/game/stats/StatsApi:getAvatarStats/{member.MemberId}?csrf_token={csrfToken}");
+    browser.Navigate(new Uri(GlobalState.BaseAelinetUri, $"/api/game/stats/StatsApi:getAvatarStats/{member.MemberId}?csrf_token={csrfToken}"));
 
     var distortions = JsonConvert.DeserializeObject<RootObject>(browser.CurrentHtml).adventureStats.byAdventureStats.Where(x => x.rule.types.Contains(RuleTypes.RULE_TYPE_PVE) && x.rule.types.Contains(RuleTypes.RULE_TYPE_DIMENSION))
                             .Select(x => new AdventureInfo { AdventureType = AdventureType.Distortion, CompletionCount = int.Parse(x.completionsCount), Name = x.rule.name.Trim(' ', '.') }).ToArray();
@@ -181,7 +184,7 @@ static void SetMemberProfileStats(GuildMember member, Browser masterBrowser)
 {
     var browser = masterBrowser.CreateReferenceView();
 
-    browser.Navigate($"https://eu.portal.sf.my.com/user/avatar/{member.MemberId}");
+    browser.Navigate(new Uri(GlobalState.BaseAelinetUri, $"/user/avatar/{member.MemberId}"));
 
     var stats = browser.Select("#portalPageBody div.region-page-body div p > span")
                 .Select(b => b.Value)
@@ -198,7 +201,7 @@ static void SetMemberProfileStats(GuildMember member, Browser masterBrowser)
         member.TacticalSense = (int)double.Parse(stats["Tactical Sense"]);
 }
 
-static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> members, Browser masterBrowser, DateTime checkTime, MemberType memberType, bool reportPlayerStatData = false, bool reportDistortionData = false)
+static void NavigateAelinetGuildSection(List<GuildMember> members, Browser masterBrowser, DateTime checkTime, MemberType memberType)
 {
     var browser = masterBrowser.CreateReferenceView();
     var sectionName = memberType == MemberType.PantheonMember ? "members" : "academy";
@@ -211,7 +214,7 @@ static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> mem
     var skipToPage = 0;
     var upToPage = 0;
 
-    browser.Navigate($"https://eu.portal.sf.my.com/guild/{sectionName}/{pantheonId}");
+    browser.Navigate(new Uri(GlobalState.BaseAelinetUri, $"/guild/{sectionName}/{GlobalState.PantheonId}"));
 
     var csrfToken = new Uri(browser.Find(ElementType.Anchor, FindBy.PartialText, "English").GetAttribute("href")).Query.Substring(1).Split('&').First(x => x.StartsWith("csrf_token")).Split('=')[1];
 
@@ -221,7 +224,7 @@ static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> mem
     if (skipToPage < 2)
     {
         parsedMembers = ParseGuildMembers(browser.XDocument.Root, checkTime, memberType).ToArray();
-        backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType, browser, csrfToken, reportPlayerStatData, reportDistortionData));
+        backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType, browser, csrfToken));
 
         members.AddRange(parsedMembers);
     }
@@ -248,7 +251,7 @@ static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> mem
         }
 
         parsedMembers = ParseGuildMembers(browser.XDocument.Root, checkTime, memberType).ToArray();
-        backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType, browser, csrfToken, reportPlayerStatData, reportDistortionData));
+        backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType, browser, csrfToken));
         members.AddRange(parsedMembers);
 
         if (upToPage > 0 && (nextPage - upToPage + 1 > 0)) break;
@@ -259,12 +262,12 @@ static void NavigateAelinetGuildSection(string pantheonId, List<GuildMember> mem
     Task.WaitAll(backgroundTasks.ToArray());
 }
 
-static IEnumerable<Task> SetMemberStats(IEnumerable<GuildMember> members, MemberType memberType, Browser browser, string csrfToken, bool reportPlayerStatData = false, bool reportDistortionData = false)
+static IEnumerable<Task> SetMemberStats(IEnumerable<GuildMember> members, MemberType memberType, Browser browser, string csrfToken)
 {
     //ticks here get truncated in value but irrelevant for the purpose of seed;
     var fudger = new Random((int)DateTime.Now.Ticks);
 
-    if (memberType == MemberType.PantheonMember && (reportDistortionData || reportPlayerStatData))
+    if (memberType == MemberType.PantheonMember && (GlobalState.ReportDistortionData || GlobalState.ReportPlayerProfileData))
         foreach (var member in members.Where(m => m.MemberType == MemberType.PantheonMember))
         {
             $"{DateTime.Now.ToString(TimestampFormat)} Processing {member.Name}".Dump();
@@ -272,12 +275,12 @@ static IEnumerable<Task> SetMemberStats(IEnumerable<GuildMember> members, Member
 
             yield return Task.Run(() =>
             {
-                if (reportDistortionData)
+                if (GlobalState.ReportDistortionData)
                     SetMemberDistortions(member, browser, csrfToken);
             })
             .ContinueWith(_ =>
             {
-                if (reportPlayerStatData)
+                if (GlobalState.ReportPlayerProfileData)
                     SetMemberProfileStats(member, browser);
             });
         }
@@ -304,7 +307,7 @@ static IEnumerable<GuildMember> ParseGuildMembers(XElement documentRoot, DateTim
         Prestige = x.Prestige,
         CreditsDonated = x.CreditsDonated,
         MaterialsDonated = x.MaterialsDonated,
-        ImageUrl = x.ImageUrl[0] == '/' ? "https://eu.portal.sf.my.com" + x.ImageUrl : x.ImageUrl,
+        ImageUrl = x.ImageUrl[0] == '/' ? new Uri(GlobalState.BaseAelinetUri, x.ImageUrl).ToString() : x.ImageUrl,
         IsGod = x.IsGod,
         IsPremium = x.IsPremium,
         IsOnline = x.IsOnline,
@@ -342,7 +345,7 @@ static long GetNumberInLong(string buffer)
 
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 // ReSharper disable MemberCanBePrivate.Global
-class GuildMember
+public class GuildMember
 {
     static readonly GregorianCalendar Calendar = new GregorianCalendar();
 
@@ -396,20 +399,37 @@ class GuildMember
     public int D4R { get; set; }
 }
 
-enum MemberType
+public enum MemberType
 {
     PantheonMember,
     AcademyMember
 }
 
-enum Locale
+public enum Locale
 {
     EN,
     DE,
     FR
 }
 
-class AdventureInfo
+public enum Region
+{
+    EU,
+    NA
+}
+
+public static class GlobalState
+{
+    public static string Username { get; set; }
+    public static string Password { get; set; }
+    public static Region Region { get; set; }
+    public static string PantheonId { get; set; }
+    public static bool ReportDistortionData { get; set; }
+    public static bool ReportPlayerProfileData { get; set; }
+    public static Uri BaseAelinetUri => Region == Region.EU ? new Uri("https://eu.portal.sf.my.com") : new Uri("https://na.portal.sf.my.com");
+}
+
+public class AdventureInfo
 {
     public string ShortCode { get; set; }
     public string Name { get; set; }
@@ -418,7 +438,7 @@ class AdventureInfo
     public bool IsRated => !string.IsNullOrEmpty(Name) && Name.EndsWith("(Rated)");
 }
 
-enum AdventureType
+public enum AdventureType
 {
     Squad,
     Group,
