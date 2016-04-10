@@ -127,9 +127,6 @@ static readonly Dictionary<string, string> DistortionToShortCodeLookup = new Dic
 
 static void LoginToAelinet()
 {
-    //Use uk english rules for parsing rather than current machine locale
-    CultureInfo.CurrentCulture = CultureInfo.CreateSpecificCulture("en-gb");
-
     GlobalState.Browser.Navigate(new Uri(GlobalState.BaseAelinetUri, "/skyforgenews"));
 
     if (GlobalState.Browser.Find(ElementType.TextField, FindBy.Id, "login") == null) return;
@@ -170,7 +167,7 @@ static void SetMemberDistortions(GuildMember member)
     browser.Navigate(new Uri(GlobalState.BaseAelinetUri, $"/api/game/stats/StatsApi:getAvatarStats/{member.MemberId}?csrf_token={GlobalState.CsrfToken}"));
 
     var distortions = JsonConvert.DeserializeObject<DungeonStatsData.AvatarStatisticsData>(browser.CurrentHtml).AdventureStats.ByAdventureStats.Where(x => x.Rule.Types.Contains(DungeonStatsData.RuleTypes.RULE_TYPE_PVE) && x.Rule.Types.Contains(DungeonStatsData.RuleTypes.RULE_TYPE_DIMENSION))
-                            .Select(x => new AdventureInfo { AdventureType = AdventureType.Distortion, CompletionCount = int.Parse(x.CompletionsCount), Name = x.Rule.Name.Trim(' ', '.') }).ToArray();
+                            .Select(x => new AdventureInfo { AdventureType = AdventureType.Distortion, CompletionCount = int.Parse(x.CompletionsCount, GlobalState.ParsingCulture), Name = x.Rule.Name.Trim(' ', '.') }).ToArray();
 
     foreach (var distortion in distortions.Where(x => DistortionToShortCodeLookup.ContainsKey(x.Name.Replace(" (Rated)", string.Empty).Trim())))
         distortion.ShortCode = DistortionToShortCodeLookup[distortion.Name.Replace(" (Rated)", string.Empty).Trim()] + (distortion.IsRated ? "R" : string.Empty);
@@ -219,7 +216,7 @@ static void SetMemberProfileStats(GuildMember member)
                 .ToDictionary(x => x.Stat, x => x.Value, StringComparer.OrdinalIgnoreCase);
 
     if (stats.ContainsKey("Tactical Sense"))
-        member.TacticalSense = (int)double.Parse(stats["Tactical Sense"]);
+        member.TacticalSense = (int)double.Parse(stats["Tactical Sense"], GlobalState.ParsingCulture);
 }
 
 static void NavigateAelinetGuildSection(MemberType memberType)
@@ -236,8 +233,6 @@ static void NavigateAelinetGuildSection(MemberType memberType)
     var upToPage = 0;
 
     browser.Navigate(new Uri(GlobalState.BaseAelinetUri, $"/guild/{sectionName}/{GlobalState.PantheonId}"));
-
-    var csrfToken = new Uri(browser.Find(ElementType.Anchor, FindBy.PartialText, "English").GetAttribute("href")).Query.Substring(1).Split('&').First(x => x.StartsWith("csrf_token")).Split('=')[1];
 
     string.Format("{0} Processing Page {1} for {2}...", DateTime.Now.ToString(TimestampFormat), 1, memberType == MemberType.PantheonMember ? "pantheon members" : "academy members").Dump();
 
@@ -340,7 +335,7 @@ static long GetNumberInLong(string buffer)
 
     if (char.IsNumber(suffix)) suffix = (char)0;
 
-    var number = double.Parse(trimmedBuffer.Replace(suffix.ToString(), "").Trim());
+    var number = double.Parse(trimmedBuffer.Replace(suffix.ToString(), "").Trim(), GlobalState.ParsingCulture);
 
     switch (char.ToUpper(suffix))
     {
@@ -362,7 +357,7 @@ public class GuildMember
 
     public DateTime CheckTime { get; set; }
     public byte WeekNumber => (byte)Calendar.GetWeekOfYear(CheckTime, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
-    public long MemberId => long.Parse(ProfileUrl.Split('/').Last());
+    public long MemberId => long.Parse(ProfileUrl.Split('/').Last(), GlobalState.ParsingCulture);
     public string Name { get; set; }
     public int Prestige { get; set; }
     public long CreditsDonated { get; set; }
@@ -422,7 +417,8 @@ public static class GlobalState
     public static string CsrfToken { get; set; }
     public static Browser Browser { get; } = new Browser();
     public static List<GuildMember> Members { get; } = new List<GuildMember>();
-    public static DateTime CheckTime { get; } = DateTime.Now;
+	public static DateTime CheckTime { get; } = DateTime.Now;
+	public static CultureInfo ParsingCulture { get;} = CultureInfo.CreateSpecificCulture("en-GB");
 }
 
 public class AdventureInfo
