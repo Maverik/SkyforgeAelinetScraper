@@ -136,13 +136,13 @@ static readonly Dictionary<int, string> DungeonResourceIdToShortCodeLookup = new
 	{2097711241, "MachavannTraining"},
 	{2097791489, "Machavann"},
 	{2097692907, "ThanatosTraining"},
-	{-9, "Thanatos"},
+	{2097791084, "Thanatos"},
 	{-3, "OceanidTraining"},
 	{-4, "Oceanid"},
 	{-5, "DemonTraining"},
 	{-6, "Demon"},
-	{-7, "GorgonideTraining"},
-	{-8, "Gorgonide"},
+	{2097852246, "AkonitaTraining"},
+	{2097791491, "Akonita"},
 };
 
 static void LoginToAelinet()
