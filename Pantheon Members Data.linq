@@ -33,6 +33,8 @@ void Main()
 	GlobalState.ReportDistortionData = false;
 	GlobalState.ReportPlayerProfileData = false;
 
+	CultureInfo.CurrentCulture = GlobalState.ParsingCulture;
+
 	if (CheckAelinetDetailsWithEnvironmentFallback())
 	{
 		LoginToAelinet();
@@ -142,7 +144,7 @@ static readonly Dictionary<int, string> DungeonResourceIdToShortCodeLookup = new
 	{-5, "DemonTraining"},
 	{-6, "Demon"},
 	{2097852246, "AkonitaTraining"},
-	{2097791491, "Akonita"},
+	{-7, "Akonita"},
 };
 
 static void LoginToAelinet()
