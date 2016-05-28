@@ -30,8 +30,8 @@ void Main()
 	//Please do not fiddle with 4 seconds to make things any faster unless you take responsibility for possibly getting banned
 	//for abusing this tool or any other sanctions that may be applied to you and anybody else in pantheon by official customer support
 	//YOU HAVE BEEN WARNED!
-	GlobalState.ReportDistortionData = false;
-	GlobalState.ReportPlayerProfileData = false;
+	GlobalState.ReportStatisticsTab = false;
+	GlobalState.ReportAvatarTab = false;
 
 	CultureInfo.CurrentCulture = GlobalState.ParsingCulture;
 
@@ -193,7 +193,7 @@ static AdventureType SetAdventureType(DungeonStatsData.Rule rule)
 }
 
 
-static void SetMemberDistortions(GuildMember member)
+static void SetMemberStatistics(GuildMember member)
 {
 	var browser = GlobalState.Browser.CreateReferenceView();
 
@@ -251,9 +251,39 @@ static void SetMemberDistortions(GuildMember member)
 	member.Oceanid = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Oceanid))?.CompletionCount ?? 0;
 	member.Demon = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Demon))?.CompletionCount ?? 0;
 	member.Gorgonide = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Gorgonide))?.CompletionCount ?? 0;
+
+	var classHoursLookup = JsonConvert.DeserializeObject<DungeonStatsData.AvatarStatisticsData>(browser.CurrentHtml).AvatarStats.ClassStats.ToDictionary(x => x.CharacterClass.ResourceId, x => TimeSpan.FromSeconds(long.Parse(x.SecondsPlayed)));
+
+	if (classHoursLookup.ContainsKey(ClassResourceIds.Alchemist))
+		member.Alchemist = Math.Round(classHoursLookup[ClassResourceIds.Alchemist].TotalHours, 1);
+	if (classHoursLookup.ContainsKey(ClassResourceIds.Archer))
+		member.Archer = Math.Round(classHoursLookup[ClassResourceIds.Archer].TotalHours, 1);
+	if (classHoursLookup.ContainsKey(ClassResourceIds.Berserker))
+		member.Berserker = Math.Round(classHoursLookup[ClassResourceIds.Berserker].TotalHours, 1);
+	if (classHoursLookup.ContainsKey(ClassResourceIds.Cryomancer))
+		member.Cryomancer = Math.Round(classHoursLookup[ClassResourceIds.Cryomancer].TotalHours, 1);
+	if (classHoursLookup.ContainsKey(ClassResourceIds.Gunner))
+		member.Gunner = Math.Round(classHoursLookup[ClassResourceIds.Gunner].TotalHours, 1);
+	if (classHoursLookup.ContainsKey(ClassResourceIds.Kinetic))
+		member.Kinetic = Math.Round(classHoursLookup[ClassResourceIds.Kinetic].TotalHours, 1);
+	if (classHoursLookup.ContainsKey(ClassResourceIds.Knight))
+		member.Knight = Math.Round(classHoursLookup[ClassResourceIds.Knight].TotalHours, 1);
+	if (classHoursLookup.ContainsKey(ClassResourceIds.Lightbinder))
+		member.Lightbinder = Math.Round(classHoursLookup[ClassResourceIds.Lightbinder].TotalHours, 1);
+	if (classHoursLookup.ContainsKey(ClassResourceIds.Monk))
+		member.Monk = Math.Round(classHoursLookup[ClassResourceIds.Monk].TotalHours, 1);
+	if (classHoursLookup.ContainsKey(ClassResourceIds.Necromancer))
+		member.Necromancer = Math.Round(classHoursLookup[ClassResourceIds.Necromancer].TotalHours, 1);
+	if (classHoursLookup.ContainsKey(ClassResourceIds.Paladin))
+		member.Paladin = Math.Round(classHoursLookup[ClassResourceIds.Paladin].TotalHours, 1);
+	if (classHoursLookup.ContainsKey(ClassResourceIds.Slayer))
+		member.Slayer = Math.Round(classHoursLookup[ClassResourceIds.Slayer].TotalHours, 1);
+	if (classHoursLookup.ContainsKey(ClassResourceIds.WarlockWitch))
+		member.WarlockWitch = Math.Round(classHoursLookup[ClassResourceIds.WarlockWitch].TotalHours, 1);
+
 }
 
-static void SetMemberProfileStats(GuildMember member)
+static void SetMemberStatisticsTab(GuildMember member)
 {
 	var browser = GlobalState.Browser.CreateReferenceView();
 
@@ -270,8 +300,64 @@ static void SetMemberProfileStats(GuildMember member)
 						})
 				.ToDictionary(x => x.Stat, x => x.Value, StringComparer.OrdinalIgnoreCase);
 
-	if (stats.ContainsKey("Tactical Sense"))
-		member.TacticalSense = (int)double.Parse(stats["Tactical Sense"], GlobalState.ParsingCulture);
+	member.ActiveClass = browser.Select("#portalPageBody div.avatar > p.avatar-rank > span").Value.Trim();
+
+	if (stats.ContainsKey(MemberProfileStatKeys.TacticalSense))
+		member.TacticalSense = (int)double.Parse(stats[MemberProfileStatKeys.TacticalSense], GlobalState.ParsingCulture);
+	if (stats.ContainsKey(MemberProfileStatKeys.Strength))
+		member.Strength = (int)double.Parse(stats[MemberProfileStatKeys.Strength], GlobalState.ParsingCulture);
+	if (stats.ContainsKey(MemberProfileStatKeys.Valor))
+		member.Valor = (int)double.Parse(stats[MemberProfileStatKeys.Valor], GlobalState.ParsingCulture);
+	if (stats.ContainsKey(MemberProfileStatKeys.Luck))
+		member.Luck = (int)double.Parse(stats[MemberProfileStatKeys.Luck], GlobalState.ParsingCulture);
+	if (stats.ContainsKey(MemberProfileStatKeys.Stamina))
+		member.Stamina = (int)double.Parse(stats[MemberProfileStatKeys.Stamina], GlobalState.ParsingCulture);
+	if (stats.ContainsKey(MemberProfileStatKeys.Spirit))
+		member.Spirit = (int)double.Parse(stats[MemberProfileStatKeys.Spirit], GlobalState.ParsingCulture);
+	if (stats.ContainsKey(MemberProfileStatKeys.Accuracy))
+		member.Accuracy = Math.Round(double.Parse(stats[MemberProfileStatKeys.Accuracy], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.Temper))
+		member.Temper = Math.Round(double.Parse(stats[MemberProfileStatKeys.Temper], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.MightEfficiency))
+		member.MightEfficiency = Math.Round(double.Parse(stats[MemberProfileStatKeys.MightEfficiency], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.CriticalChance))
+		member.CriticalChance = Math.Round(double.Parse(stats[MemberProfileStatKeys.CriticalChance], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.CrushingBlow))
+		member.CrushingBlow = Math.Round(double.Parse(stats[MemberProfileStatKeys.CrushingBlow], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.DischargeRecovery))
+		member.DischargeRecovery = Math.Round(double.Parse(stats[MemberProfileStatKeys.DischargeRecovery], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.Solidity))
+		member.Solidity = Math.Round(double.Parse(stats[MemberProfileStatKeys.Solidity], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.HealthBonus))
+		member.HealthBonus = Math.Round(double.Parse(stats[MemberProfileStatKeys.HealthBonus], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.ShieldPower))
+		member.ShieldPower = Math.Round(double.Parse(stats[MemberProfileStatKeys.ShieldPower], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.RangedDamage))
+		member.RangedDamage = Math.Round(double.Parse(stats[MemberProfileStatKeys.RangedDamage], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.Persistence))
+		member.Persistence = Math.Round(double.Parse(stats[MemberProfileStatKeys.Persistence], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.Irradiation))
+		member.Irradiation = Math.Round(double.Parse(stats[MemberProfileStatKeys.Irradiation], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.Violence))
+		member.Violence = Math.Round(double.Parse(stats[MemberProfileStatKeys.Violence], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.Endurance))
+		member.Endurance = Math.Round(double.Parse(stats[MemberProfileStatKeys.Endurance], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.Adaptation))
+		member.Adaptation = Math.Round(double.Parse(stats[MemberProfileStatKeys.Adaptation], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.DashActivation))
+		member.DashActivation = Math.Round(double.Parse(stats[MemberProfileStatKeys.DashActivation], GlobalState.ParsingCulture), 1);
+	if (stats.ContainsKey(MemberProfileStatKeys.ColdResistance))
+		member.ColdResistance = (int)double.Parse(stats[MemberProfileStatKeys.ColdResistance], GlobalState.ParsingCulture);
+	if (stats.ContainsKey(MemberProfileStatKeys.ElectricityResistance))
+		member.ElectricityResistance = (int)double.Parse(stats[MemberProfileStatKeys.ElectricityResistance], GlobalState.ParsingCulture);
+	if (stats.ContainsKey(MemberProfileStatKeys.PoisonResistance))
+		member.PoisonResistance = (int)double.Parse(stats[MemberProfileStatKeys.PoisonResistance], GlobalState.ParsingCulture);
+	if (stats.ContainsKey(MemberProfileStatKeys.RadiationResistance))
+		member.RadiationResistance = (int)double.Parse(stats[MemberProfileStatKeys.RadiationResistance], GlobalState.ParsingCulture);
+	if (stats.ContainsKey(MemberProfileStatKeys.HypnosisResistance))
+		member.HypnosisResistance = (int)double.Parse(stats[MemberProfileStatKeys.HypnosisResistance], GlobalState.ParsingCulture);
+	if (stats.ContainsKey(MemberProfileStatKeys.AstralResistance))
+		member.AstralResistance = (int)double.Parse(stats[MemberProfileStatKeys.AstralResistance], GlobalState.ParsingCulture);
 }
 
 static void NavigateAelinetGuildSection(MemberType memberType)
@@ -295,7 +381,7 @@ static void NavigateAelinetGuildSection(MemberType memberType)
 	if (skipToPage < 2)
 	{
 		parsedMembers = ParseGuildMembers(browser, memberType).ToArray();
-		backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType));
+		backgroundTasks.AddRange(SetMemberTabStatistics(parsedMembers));
 
 		GlobalState.Members.AddRange(parsedMembers);
 	}
@@ -322,7 +408,7 @@ static void NavigateAelinetGuildSection(MemberType memberType)
 		}
 
 		parsedMembers = ParseGuildMembers(browser, memberType).ToArray();
-		backgroundTasks.AddRange(SetMemberStats(parsedMembers, memberType));
+		backgroundTasks.AddRange(SetMemberTabStatistics(parsedMembers));
 		GlobalState.Members.AddRange(parsedMembers);
 
 		if (upToPage > 0 && (nextPage - upToPage + 1 > 0)) break;
@@ -333,26 +419,26 @@ static void NavigateAelinetGuildSection(MemberType memberType)
 	Task.WaitAll(backgroundTasks.ToArray());
 }
 
-static IEnumerable<Task> SetMemberStats(IEnumerable<GuildMember> members, MemberType memberType)
+static IEnumerable<Task> SetMemberTabStatistics(IEnumerable<GuildMember> members)
 {
 	//ticks here get truncated in value but irrelevant for the purpose of seed;
 	var fudger = new Random((int)DateTime.Now.Ticks);
 
-	if (memberType == MemberType.PantheonMember && (GlobalState.ReportDistortionData || GlobalState.ReportPlayerProfileData))
-		foreach (var member in members.Where(m => m.MemberType == MemberType.PantheonMember))
+	if (GlobalState.ReportStatisticsTab || GlobalState.ReportAvatarTab)
+		foreach (var member in members)
 		{
 			$"{DateTime.Now.ToString(TimestampFormat)} Processing {member.Name}".Dump();
 			Thread.Sleep(1000 + fudger.Next(500, 3000));
 
 			yield return Task.Run(() =>
 			{
-				if (GlobalState.ReportDistortionData)
-					SetMemberDistortions(member);
+				if (GlobalState.ReportStatisticsTab)
+					SetMemberStatistics(member);
 			})
 			.ContinueWith(_ =>
 			{
-				if (GlobalState.ReportPlayerProfileData)
-					SetMemberProfileStats(member);
+				if (GlobalState.ReportAvatarTab)
+					SetMemberStatisticsTab(member);
 			});
 		}
 }
@@ -362,7 +448,7 @@ static IEnumerable<GuildMember> ParseGuildMembers(Browser browser, MemberType me
 
 	return browser.Select("div.guild-member").Select(x => new GuildMember
 	{
-		CheckTime = GlobalState.CheckTime,
+		CheckTime = GlobalState.CheckTimeUTC,
 		Prestige = (int)GetNumberInLong(x.Select("div.guild-member-td-c > p").ElementAt(0).Value),
 		CreditsDonated = GetNumberInLong(x.Select("div.guild-member-td-c > p").ElementAt(1).Value),
 		MaterialsDonated = (int)GetNumberInLong(x.Select("div.guild-member-td-c > p").ElementAt(2).Value),
@@ -471,6 +557,49 @@ public class GuildMember
 	public int Demon { get; set; }
 	public int GorgonideTraining { get; set; }
 	public int Gorgonide { get; set; }
+	//Let the epeen competitions begin!
+	public string ActiveClass { get; set; }
+	public int Strength { get; set; }
+	public int Valor { get; set; }
+	public int Luck { get; set; }
+	public int Spirit { get; set; }
+	public int Stamina { get; set; }
+	public double Accuracy { get; set; }
+	public double Temper { get; set; }
+	public double MightEfficiency { get; set; }
+	public double CriticalChance { get; set; }
+	public double CrushingBlow { get; set; }
+	public double DischargeRecovery { get; set; }
+	public double Solidity { get; set; }
+	public double HealthBonus { get; set; }
+	public double ShieldPower { get; set; }
+	public double RangedDamage { get; set; }
+	public double Persistence { get; set; }
+	public double Irradiation { get; set; }
+	public double Violence { get; set; }
+	public double Endurance { get; set; }
+	public double Adaptation { get; set; }
+	public double DashActivation { get; set; }
+	public int ColdResistance { get; set; }
+	public int ElectricityResistance { get; set; }
+	public int PoisonResistance { get; set; }
+	public int RadiationResistance { get; set; }
+	public int HypnosisResistance { get; set; }
+	public int AstralResistance { get; set; }
+	public double Gunner { get; set; }
+	public double Paladin { get; set; }
+	public double Knight { get; set; }
+	public double Necromancer { get; set; }
+	public double Slayer { get; set; }
+	public double Cryomancer { get; set; }
+	public double Monk { get; set; }
+	public double Berserker { get; set; }
+	//public double Templar { get; set; }
+	public double Archer { get; set; }
+	public double Kinetic { get; set; }
+	public double Lightbinder { get; set; }
+	public double Alchemist { get; set; }
+	public double WarlockWitch { get; set; }
 }
 
 public static class GlobalState
@@ -479,13 +608,13 @@ public static class GlobalState
 	public static string Password { get; set; }
 	public static Region Region { get; set; }
 	public static string PantheonId { get; set; }
-	public static bool ReportDistortionData { get; set; }
-	public static bool ReportPlayerProfileData { get; set; }
+	public static bool ReportStatisticsTab { get; set; }
+	public static bool ReportAvatarTab { get; set; }
 	public static Uri BaseAelinetUri => Region == Region.EU ? new Uri("https://eu.portal.sf.my.com") : new Uri("https://na.portal.sf.my.com");
 	public static string CsrfToken { get; set; }
 	public static Browser Browser { get; } = new Browser();
 	public static List<GuildMember> Members { get; } = new List<GuildMember>();
-	public static DateTime CheckTime { get; } = DateTime.Now;
+	public static DateTime CheckTimeUTC { get; } = DateTime.UtcNow;
 	public static CultureInfo ParsingCulture { get; } = CultureInfo.CreateSpecificCulture("en-GB");
 }
 
@@ -528,6 +657,58 @@ public enum AdventureType
 	TrainingAvatar,
 	Avatar
 }
+
+public static class MemberProfileStatKeys
+{
+	public const string TacticalSense = "Tactical Sense";
+	public const string Strength = "Strength";
+	public const string Valor = "Valor";
+	public const string Luck = "Luck";
+	public const string Spirit = "Spirit";
+	public const string Stamina = "Stamina";
+	public const string Accuracy = "Accuracy";
+	public const string Temper = "Temper";
+	public const string MightEfficiency = "Might Efficiency";
+	public const string CriticalChance = "Critical Chance";
+	public const string CrushingBlow = "Crushing Blow";
+	public const string DischargeRecovery = "Discharge Recovery";
+	public const string Solidity = "Solidity";
+	public const string HealthBonus = "Health Bonus";
+	public const string ShieldPower = "Shield Power";
+	public const string RangedDamage = "Ranged Damage";
+	public const string Persistence = "Persistence";
+	public const string Irradiation = "Irradiation";
+	public const string Violence = "Violence";
+	public const string Endurance = "Endurance";
+	public const string Adaptation = "Adaptation";
+	public const string DashActivation = "Dash Activation";
+	public const string ColdResistance = "Cold Resistance";
+	public const string ElectricityResistance = "Electricity Resistance";
+	public const string PoisonResistance = "Poison Resistance";
+	public const string RadiationResistance = "Radiation Resistance";
+	public const string HypnosisResistance = "Hypnosis Resistance";
+	public const string AstralResistance = "Astral Resistance";
+}
+
+public static class ClassResourceIds
+{
+	public const int Gunner = 2097667150;
+	public const int Paladin = 49774595;
+	public const int Knight = 40154117;
+	public const int Necromancer = 57444381;
+	public const int Slayer = 2097623392;
+	public const int Cryomancer = 57444373;
+	public const int Monk = 2097665538;
+	public const int Berserker = 57444365;
+	//Not the slightest clue which class is this!
+	public const int Templar = 106415115;
+	public const int Archer = 57444357;
+	public const int Kinetic = 26209282;
+	public const int Lightbinder = 95283204;
+	public const int Alchemist = 34835461;
+	public const int WarlockWitch = 138469379;
+}
+
 
 #endregion
 
