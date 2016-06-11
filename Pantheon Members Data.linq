@@ -149,16 +149,17 @@ static readonly Dictionary<int, string> DungeonResourceIdToShortCodeLookup = new
 
 static void LoginToAelinet()
 {
-	GlobalState.Browser.Navigate(new Uri(GlobalState.BaseAelinetUri, "/skyforgenews"));
+	GlobalState.Browser = new Browser();
+	GlobalState.Members.Clear(); 
 
-	if (GlobalState.Browser.Find(ElementType.TextField, FindBy.Id, "login") == null) return;
+	GlobalState.Browser.Navigate(new Uri(GlobalState.BaseAelinetUri, "/skyforgenews"));
 
 	GlobalState.Browser.Find(ElementType.TextField, FindBy.Id, "login").Value = GlobalState.Username;
 	GlobalState.Browser.Find(ElementType.TextField, FindBy.Id, "password").Value = GlobalState.Password;
 	GlobalState.Browser.Find(ElementType.Checkbox, FindBy.Id, "remember").Checked = false;
 	GlobalState.Browser.Find(ElementType.Button, FindBy.Value, "log in").Click();
 
-	if (!GlobalState.Browser.Url.Query.Contains("auth_result=success"))
+	if (GlobalState.Browser.Find(ElementType.TextField, FindBy.Id, "login").Exists || GlobalState.Browser.Url.ToString().EndsWith("auth_result=failed"))
 		throw new ApplicationException($"Login failed for {GlobalState.Region} Aelinet portal!");
 
 	SetCsrfToken();
@@ -448,7 +449,7 @@ static IEnumerable<GuildMember> ParseGuildMembers(Browser browser, MemberType me
 
 	return browser.Select("div.guild-member").Select(x => new GuildMember
 	{
-		CheckTime = GlobalState.CheckTimeUTC,
+		CheckTimeUTC = GlobalState.CheckTimeUTC,
 		Prestige = (int)GetNumberInLong(x.Select("div.guild-member-td-c > p").ElementAt(0).Value),
 		CreditsDonated = GetNumberInLong(x.Select("div.guild-member-td-c > p").ElementAt(1).Value),
 		MaterialsDonated = (int)GetNumberInLong(x.Select("div.guild-member-td-c > p").ElementAt(2).Value),
@@ -496,8 +497,8 @@ public class GuildMember
 {
 	static readonly GregorianCalendar Calendar = new GregorianCalendar();
 
-	public DateTime CheckTime { get; set; }
-	public byte WeekNumber => (byte)Calendar.GetWeekOfYear(CheckTime, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+	public DateTime CheckTimeUTC { get; set; }
+	public byte WeekNumber => (byte)Calendar.GetWeekOfYear(CheckTimeUTC, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
 	public long MemberId => long.Parse(ProfileUrl.Split('/').Last(), GlobalState.ParsingCulture);
 	public string Name { get; set; }
 	public int Prestige { get; set; }
@@ -612,7 +613,7 @@ public static class GlobalState
 	public static bool ReportAvatarTab { get; set; }
 	public static Uri BaseAelinetUri => Region == Region.EU ? new Uri("https://eu.portal.sf.my.com") : new Uri("https://na.portal.sf.my.com");
 	public static string CsrfToken { get; set; }
-	public static Browser Browser { get; } = new Browser();
+	public static Browser Browser { get; set; }
 	public static List<GuildMember> Members { get; } = new List<GuildMember>();
 	public static DateTime CheckTimeUTC { get; } = DateTime.UtcNow;
 	public static CultureInfo ParsingCulture { get; } = CultureInfo.CreateSpecificCulture("en-GB");
