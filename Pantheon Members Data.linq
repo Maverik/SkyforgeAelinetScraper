@@ -1,4 +1,5 @@
 <Query Kind="Program">
+  <Output>DataGrids</Output>
   <NuGetReference Prerelease="true">Newtonsoft.Json</NuGetReference>
   <NuGetReference>SimpleBrowser</NuGetReference>
   <Namespace>Newtonsoft.Json</Namespace>
@@ -144,14 +145,15 @@ static readonly Dictionary<int, string> DungeonResourceIdToShortCodeLookup = new
 	{-5, "DemonTraining"},
 	{-6, "Demon"},
 	{2097852246, "AkonitaTraining"},
-	{-7, "Akonita"},
+	{2097892833, "Akonita"},
 };
 
 static void LoginToAelinet()
 {
 	GlobalState.Browser = new Browser();
 	GlobalState.Members.Clear(); 
-
+	GlobalState.CheckTimeUTC = DateTime.UtcNow;
+	
 	GlobalState.Browser.Navigate(new Uri(GlobalState.BaseAelinetUri, "/skyforgenews"));
 
 	GlobalState.Browser.Find(ElementType.TextField, FindBy.Id, "login").Value = GlobalState.Username;
@@ -423,13 +425,12 @@ static void NavigateAelinetGuildSection(MemberType memberType)
 static IEnumerable<Task> SetMemberTabStatistics(IEnumerable<GuildMember> members)
 {
 	//ticks here get truncated in value but irrelevant for the purpose of seed;
-	var fudger = new Random((int)DateTime.Now.Ticks);
-
+	
 	if (GlobalState.ReportStatisticsTab || GlobalState.ReportAvatarTab)
 		foreach (var member in members)
 		{
 			$"{DateTime.Now.ToString(TimestampFormat)} Processing {member.Name}".Dump();
-			Thread.Sleep(1000 + fudger.Next(500, 3000));
+			Thread.Sleep(750 + GlobalState.Rng.Next(0, 500));
 
 			yield return Task.Run(() =>
 			{
@@ -615,8 +616,9 @@ public static class GlobalState
 	public static string CsrfToken { get; set; }
 	public static Browser Browser { get; set; }
 	public static List<GuildMember> Members { get; } = new List<GuildMember>();
-	public static DateTime CheckTimeUTC { get; } = DateTime.UtcNow;
+	public static DateTime CheckTimeUTC { get; set; }
 	public static CultureInfo ParsingCulture { get; } = CultureInfo.CreateSpecificCulture("en-GB");
+	public static Random Rng { get; } = new Random((int)DateTime.Now.Ticks);
 }
 
 public class AdventureInfo
