@@ -110,42 +110,42 @@ static void SetPantheonId()
 
 static readonly Dictionary<int, string> DungeonResourceIdToShortCodeLookup = new Dictionary<int, string>
 {
-	{2097792503, "A1"},
-	{2097792472, "A2"},
-	{2097792480, "A3"},
-	{2097792466, "A4"},
-	{2097792500, "B1"},
-	{2097792445, "B2"},
-	{2097792424, "B3"},
-	{2097792470, "B4"},
-	{2097792436, "C1"},
-	{2097792421, "C2"},
-	{2097792452, "C3"},
-	{2097792498, "C4"},
-	{2097883211, "A1R"},
-	{2097883210, "A2R"},
-	{2097883212, "A3R"},
-	{2097883213, "A4R"},
-	{2097886787, "B1R"},
-	{2097886788, "B2R"},
-	{2097886789, "B3R"},
-	{2097886790, "B4R"},
-	{2097890125, "C1R"},
-	{2097890128, "C2R"},
-	{-1, "C3R"},
-	{-2, "C4R"},
-	{2097699736, "IntegratorTraining"},
-	{2097791491, "Integrator"},
-	{2097711241, "MachavannTraining"},
-	{2097791489, "Machavann"},
-	{2097692907, "ThanatosTraining"},
-	{2097791084, "Thanatos"},
-	{-3, "OceanidTraining"},
-	{-4, "Oceanid"},
-	{-5, "DemonTraining"},
-	{-6, "Demon"},
-	{2097852246, "AkonitaTraining"},
-	{2097892833, "Akonita"},
+	{2097792503, nameof(GuildMember.A1)},
+	{2097792472, nameof(GuildMember.A2)},
+	{2097792480, nameof(GuildMember.A3)},
+	{2097792466, nameof(GuildMember.A4)},
+	{2097792500, nameof(GuildMember.B1)},
+	{2097792445, nameof(GuildMember.B2)},
+	{2097792424, nameof(GuildMember.B3)},
+	{2097792470, nameof(GuildMember.B4)},
+	{2097792436, nameof(GuildMember.C1)},
+	{2097792421, nameof(GuildMember.C2)},
+	{2097792452, nameof(GuildMember.C3)},
+	{2097792498, nameof(GuildMember.C4)},
+	{2097883211, nameof(GuildMember.A1R)},
+	{2097883210, nameof(GuildMember.A2R)},
+	{2097883212, nameof(GuildMember.A3R)},
+	{2097883213, nameof(GuildMember.A4R)},
+	{2097886787, nameof(GuildMember.B1R)},
+	{2097886788, nameof(GuildMember.B2R)},
+	{2097886789, nameof(GuildMember.B3R)},
+	{2097886790, nameof(GuildMember.B4R)},
+	{2097890125, nameof(GuildMember.C1R)},
+	{2097890128, nameof(GuildMember.C2R)},
+	{-1, nameof(GuildMember.C3R)},
+	{-2, nameof(GuildMember.C4R)},
+	{2097699736, nameof(GuildMember.IntegratorTraining)},
+	{2097791491, nameof(GuildMember.Integrator)},
+	{2097711241, nameof(GuildMember.MachavannTraining)},
+	{2097791489, nameof(GuildMember.Machavann)},
+	{2097692907, nameof(GuildMember.ThanatosTraining)},
+	{2097791084, nameof(GuildMember.Thanatos)},
+	{-3, nameof(GuildMember.OceanidTraining)},
+	{-4, nameof(GuildMember.Oceanid)},
+	{-5, nameof(GuildMember.DemonTraining)},
+	{-6, nameof(GuildMember.Demon)},
+	{2097852246, nameof(GuildMember.AkonitaTraining)},
+	{2097892833, nameof(GuildMember.Akonita)},
 };
 
 static void LoginToAelinet()
@@ -246,14 +246,14 @@ static void SetMemberStatistics(GuildMember member)
 	member.ThanatosTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.ThanatosTraining))?.CompletionCount ?? 0;
 	member.OceanidTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.OceanidTraining))?.CompletionCount ?? 0;
 	member.DemonTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.DemonTraining))?.CompletionCount ?? 0;
-	member.GorgonideTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.GorgonideTraining))?.CompletionCount ?? 0;
+	member.AkonitaTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.AkonitaTraining))?.CompletionCount ?? 0;
 
 	member.Integrator = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Integrator))?.CompletionCount ?? 0;
 	member.Machavann = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Machavann))?.CompletionCount ?? 0;
 	member.Thanatos = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Thanatos))?.CompletionCount ?? 0;
 	member.Oceanid = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Oceanid))?.CompletionCount ?? 0;
 	member.Demon = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Demon))?.CompletionCount ?? 0;
-	member.Gorgonide = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Gorgonide))?.CompletionCount ?? 0;
+	member.Akonita = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Akonita))?.CompletionCount ?? 0;
 
 	var classHoursLookup = JsonConvert.DeserializeObject<DungeonStatsData.AvatarStatisticsData>(browser.CurrentHtml).AvatarStats.ClassStats.ToDictionary(x => x.CharacterClass.ResourceId, x => TimeSpan.FromSeconds(long.Parse(x.SecondsPlayed)));
 
@@ -557,8 +557,8 @@ public class GuildMember
 	public int Oceanid { get; set; }
 	public int DemonTraining { get; set; }
 	public int Demon { get; set; }
-	public int GorgonideTraining { get; set; }
-	public int Gorgonide { get; set; }
+	public int AkonitaTraining { get; set; }
+	public int Akonita { get; set; }
 	//Let the epeen competitions begin!
 	public string ActiveClass { get; set; }
 	public int Strength { get; set; }
