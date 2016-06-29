@@ -27,8 +27,8 @@ void Main()
 	GlobalState.Password = "";
 
 	//Report extended stats for players. Please note that this will significantly increase time to report data if set to true
-	//The run time will increase upwards of 4 seconds per Pantheon member (academy members are not parsed for these stats)
-	//Please do not fiddle with 4 seconds to make things any faster unless you take responsibility for possibly getting banned
+	//The run time will increase upwards of 1 second per Pantheon member (academy members are not parsed for these stats)
+	//Please do not fiddle with 1 second to make things any faster unless you take responsibility for possibly getting banned
 	//for abusing this tool or any other sanctions that may be applied to you and anybody else in pantheon by official customer support
 	//YOU HAVE BEEN WARNED!
 	GlobalState.ReportStatisticsTab = false;
