@@ -140,8 +140,8 @@ static readonly Dictionary<int, string> DungeonResourceIdToShortCodeLookup = new
 	{2097791489, nameof(GuildMember.Machavann)},
 	{2097692907, nameof(GuildMember.ThanatosTraining)},
 	{2097791084, nameof(GuildMember.Thanatos)},
-	{-3, nameof(GuildMember.OceanidTraining)},
-	{-4, nameof(GuildMember.Oceanid)},
+	{-3, nameof(GuildMember.TolMonterTraining)},
+	{-4, nameof(GuildMember.TolMonter)},
 	{-5, nameof(GuildMember.DemonTraining)},
 	{-6, nameof(GuildMember.Demon)},
 	{2097852246, nameof(GuildMember.AkonitaTraining)},
@@ -244,14 +244,14 @@ static void SetMemberStatistics(GuildMember member)
 	member.IntegratorTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.IntegratorTraining))?.CompletionCount ?? 0;
 	member.MachavannTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.MachavannTraining))?.CompletionCount ?? 0;
 	member.ThanatosTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.ThanatosTraining))?.CompletionCount ?? 0;
-	member.OceanidTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.OceanidTraining))?.CompletionCount ?? 0;
+	member.TolMonterTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.TolMonterTraining))?.CompletionCount ?? 0;
 	member.DemonTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.DemonTraining))?.CompletionCount ?? 0;
 	member.AkonitaTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.AkonitaTraining))?.CompletionCount ?? 0;
 
 	member.Integrator = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Integrator))?.CompletionCount ?? 0;
 	member.Machavann = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Machavann))?.CompletionCount ?? 0;
 	member.Thanatos = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Thanatos))?.CompletionCount ?? 0;
-	member.Oceanid = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Oceanid))?.CompletionCount ?? 0;
+	member.TolMonter = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.TolMonter))?.CompletionCount ?? 0;
 	member.Demon = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Demon))?.CompletionCount ?? 0;
 	member.Akonita = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Akonita))?.CompletionCount ?? 0;
 
@@ -553,8 +553,8 @@ public class GuildMember
 	public int ThanatosTraining { get; set; }
 	public int Thanatos { get; set; }
 	//Placeholder columns that I don't know the name of at this point!
-	public int OceanidTraining { get; set; }
-	public int Oceanid { get; set; }
+	public int TolMonterTraining { get; set; }
+	public int TolMonter { get; set; }
 	public int DemonTraining { get; set; }
 	public int Demon { get; set; }
 	public int AkonitaTraining { get; set; }
