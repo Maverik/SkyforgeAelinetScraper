@@ -303,6 +303,8 @@ static void SetMemberStatisticsTab(GuildMember member)
 						})
 				.ToDictionary(x => x.Stat, x => x.Value, StringComparer.OrdinalIgnoreCase);
 
+	if(!stats.Any()) return;
+
 	member.ActiveClass = browser.Select("#portalPageBody div.avatar > p.avatar-rank > span").Value.Trim();
 
 	if (stats.ContainsKey(MemberProfileStatKeys.TacticalSense))
