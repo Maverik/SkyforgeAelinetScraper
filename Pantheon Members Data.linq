@@ -128,6 +128,9 @@ static readonly Dictionary<int, string> DungeonResourceIdToShortCodeLookup = new
     {2097792421, nameof(GuildMember.C2)},
     {2097792452, nameof(GuildMember.C3)},
     {2097792498, nameof(GuildMember.C4)},
+	{2097792423, nameof(GuildMember.D1)},
+	{2097792412, nameof(GuildMember.D2)},
+
     {2097883211, nameof(GuildMember.A1R)},
     {2097883210, nameof(GuildMember.A2R)},
     {2097883212, nameof(GuildMember.A3R)},
@@ -140,6 +143,9 @@ static readonly Dictionary<int, string> DungeonResourceIdToShortCodeLookup = new
     {2097890128, nameof(GuildMember.C2R)},
     {-1, nameof(GuildMember.C3R)},
     {-2, nameof(GuildMember.C4R)},
+	{-7, nameof(GuildMember.D1R)},
+	{-8, nameof(GuildMember.D2R)},
+	
     {2097699736, nameof(GuildMember.IntegratorTraining)},
     {2097791491, nameof(GuildMember.Integrator)},
     {2097711241, nameof(GuildMember.MachavannTraining)},
@@ -311,6 +317,8 @@ static void SetMemberStatisticsTab(GuildMember member)
                             Value = string.Join(" - ", v.Trim().Split('-').SelectMany(rV => rV.Split('|').Select(x => x.Trim(' ', '{', '}', '%'))).Where((_, i) => i % 2 == 0))
                         })
                 .ToDictionary(x => x.Stat, x => x.Value, StringComparer.OrdinalIgnoreCase);
+
+	if(!stats.Any()) return;
 
     member.ActiveClass = browser.Select("#portalPageBody div.avatar > p.avatar-rank > span").Value.Trim();
 
