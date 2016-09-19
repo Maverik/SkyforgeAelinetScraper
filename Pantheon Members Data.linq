@@ -128,8 +128,10 @@ static readonly Dictionary<int, string> DungeonResourceIdToShortCodeLookup = new
     {2097792421, nameof(GuildMember.C2)},
     {2097792452, nameof(GuildMember.C3)},
     {2097792498, nameof(GuildMember.C4)},
-	{2097792423, nameof(GuildMember.D1)},
-	{2097792412, nameof(GuildMember.D2)},
+    {2097792423, nameof(GuildMember.D1)},
+    {2097792412, nameof(GuildMember.D2)},
+    {2097792462, nameof(GuildMember.D3)},
+    {2097792404, nameof(GuildMember.D4)},
 
     {2097883211, nameof(GuildMember.A1R)},
     {2097883210, nameof(GuildMember.A2R)},
@@ -143,8 +145,8 @@ static readonly Dictionary<int, string> DungeonResourceIdToShortCodeLookup = new
     {2097890128, nameof(GuildMember.C2R)},
     {-1, nameof(GuildMember.C3R)},
     {-2, nameof(GuildMember.C4R)},
-	{-7, nameof(GuildMember.D1R)},
-	{-8, nameof(GuildMember.D2R)},
+    {-7, nameof(GuildMember.D1R)},
+    {-8, nameof(GuildMember.D2R)},
 	
     {2097699736, nameof(GuildMember.IntegratorTraining)},
     {2097791491, nameof(GuildMember.Integrator)},
