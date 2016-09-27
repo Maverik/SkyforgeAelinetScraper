@@ -9,6 +9,22 @@
   <Namespace>System.Threading.Tasks</Namespace>
 </Query>
 
+/*
+   Copyright 2016 Maverik Gately
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 void Main()
 {
 
@@ -31,8 +47,8 @@ void Main()
     //Please do not fiddle with 1 second to make things any faster unless you take responsibility for possibly getting banned
     //for abusing this tool or any other sanctions that may be applied to you and anybody else in pantheon by official customer support
     //YOU HAVE BEEN WARNED!
-    GlobalState.ReportStatisticsTab = false;
-    GlobalState.ReportAvatarTab = false;
+    GlobalState.ReportStatisticsTab = true;
+    GlobalState.ReportAvatarTab = true;
 
     //Configure the following if you need to use proxy to access internet
     //Change UseProxy to true and setup host & port for your proxy
@@ -147,7 +163,7 @@ static readonly Dictionary<int, string> DungeonResourceIdToShortCodeLookup = new
     {-2, nameof(GuildMember.C4R)},
     {-7, nameof(GuildMember.D1R)},
     {-8, nameof(GuildMember.D2R)},
-	
+
     {2097699736, nameof(GuildMember.IntegratorTraining)},
     {2097791491, nameof(GuildMember.Integrator)},
     {2097711241, nameof(GuildMember.MachavannTraining)},
@@ -158,6 +174,8 @@ static readonly Dictionary<int, string> DungeonResourceIdToShortCodeLookup = new
     {-4, nameof(GuildMember.TolMonter)},
     {-5, nameof(GuildMember.DemonTraining)},
     {-6, nameof(GuildMember.Demon)},
+    {-9, nameof(GuildMember.MantideTraining)},
+    {-10, nameof(GuildMember.Mantide)},
     {2097852246, nameof(GuildMember.AkonitaTraining)},
     {2097892833, nameof(GuildMember.Akonita)},
 };
@@ -165,9 +183,9 @@ static readonly Dictionary<int, string> DungeonResourceIdToShortCodeLookup = new
 static void LoginToAelinet()
 {
     GlobalState.Browser = new Browser();
-    
-    if(GlobalState.UseProxy) GlobalState.Browser.SetProxy(GlobalState.ProxyHost, GlobalState.ProxyPort);
-    
+
+    if (GlobalState.UseProxy) GlobalState.Browser.SetProxy(GlobalState.ProxyHost, GlobalState.ProxyPort);
+
     GlobalState.Members.Clear();
     GlobalState.CheckTimeUTC = DateTime.UtcNow;
 
@@ -229,7 +247,8 @@ static void SetMemberStatistics(GuildMember member)
                             ResourceId = x.Rule.ResourceId,
                             ShortCode = DungeonResourceIdToShortCodeLookup.ContainsKey(x.Rule.ResourceId) ? DungeonResourceIdToShortCodeLookup[x.Rule.ResourceId] : x.Rule.ResourceId.ToString(),
                             CompletionCount = int.Parse(x.CompletionsCount, GlobalState.ParsingCulture),
-                            Name = x.Rule.Name.Trim(' ', '.')
+                            Name = x.Rule.Name.Trim(' ', '.'),
+                            TimeSpent = TimeSpan.FromMilliseconds(double.Parse(x.TimeSpent))
                         })
                         .ToArray();
 
@@ -264,6 +283,7 @@ static void SetMemberStatistics(GuildMember member)
     member.TolMonterTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.TolMonterTraining))?.CompletionCount ?? 0;
     member.DemonTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.DemonTraining))?.CompletionCount ?? 0;
     member.AkonitaTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.AkonitaTraining))?.CompletionCount ?? 0;
+    member.MantideTraining = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.MantideTraining))?.CompletionCount ?? 0;
 
     member.Integrator = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Integrator))?.CompletionCount ?? 0;
     member.Machavann = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Machavann))?.CompletionCount ?? 0;
@@ -271,6 +291,23 @@ static void SetMemberStatistics(GuildMember member)
     member.TolMonter = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.TolMonter))?.CompletionCount ?? 0;
     member.Demon = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Demon))?.CompletionCount ?? 0;
     member.Akonita = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Akonita))?.CompletionCount ?? 0;
+    member.Mantide = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Mantide))?.CompletionCount ?? 0;
+
+    member.IntegratorTrainingTimeSpent = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.IntegratorTraining))?.TimeSpent ?? TimeSpan.Zero;
+    member.MachavannTrainingTimeSpent = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.MachavannTraining))?.TimeSpent ?? TimeSpan.Zero;
+    member.ThanatosTrainingTimeSpent = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.ThanatosTraining))?.TimeSpent ?? TimeSpan.Zero;
+    member.TolMonterTrainingTimeSpent = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.TolMonterTraining))?.TimeSpent ?? TimeSpan.Zero;
+    member.DemonTrainingTimeSpent = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.DemonTraining))?.TimeSpent ?? TimeSpan.Zero;
+    member.AkonitaTrainingTimeSpent = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.AkonitaTraining))?.TimeSpent ?? TimeSpan.Zero;
+    member.MantideTrainingTimeSpent = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.TrainingAvatar && d.ShortCode == nameof(member.MantideTraining))?.TimeSpent ?? TimeSpan.Zero;
+
+    member.IntegratorTimeSpent = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Integrator))?.TimeSpent ?? TimeSpan.Zero;
+    member.MachavannTimeSpent = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Machavann))?.TimeSpent ?? TimeSpan.Zero;
+    member.ThanatosTimeSpent = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Thanatos))?.TimeSpent ?? TimeSpan.Zero;
+    member.TolMonterTimeSpent = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.TolMonter))?.TimeSpent ?? TimeSpan.Zero;
+    member.DemonTimeSpent = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Demon))?.TimeSpent ?? TimeSpan.Zero;
+    member.AkonitaTimeSpent = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Akonita))?.TimeSpent ?? TimeSpan.Zero;
+    member.MantideTimeSpent = dungeonData.SingleOrDefault(d => d.AdventureType == AdventureType.Avatar && d.ShortCode == nameof(member.Mantide))?.TimeSpent ?? TimeSpan.Zero;
 
     var classHoursLookup = JsonConvert.DeserializeObject<DungeonStatsData.AvatarStatisticsData>(browser.CurrentHtml).AvatarStats.ClassStats.ToDictionary(x => x.CharacterClass.ResourceId, x => TimeSpan.FromSeconds(long.Parse(x.SecondsPlayed)));
 
@@ -320,7 +357,7 @@ static void SetMemberStatisticsTab(GuildMember member)
                         })
                 .ToDictionary(x => x.Stat, x => x.Value, StringComparer.OrdinalIgnoreCase);
 
-	if(!stats.Any()) return;
+    if (!stats.Any()) return;
 
     member.ActiveClass = browser.Select("#portalPageBody div.avatar > p.avatar-rank > span").Value.Trim();
 
@@ -388,7 +425,7 @@ static void NavigateAelinetGuildSection(MemberType memberType)
     var sectionName = memberType == MemberType.PantheonMember ? "members" : "academy";
     var backgroundTasks = new List<Task>();
     GuildMember[] parsedMembers;
-    var nextPage = 2;
+    var nextPage = 1;
 
     //DEBUGGING AIDS - DON'T MESS WITH THESE UNLESS YOU KNOW WHAT YOU'RE DOING
     //THIS TAKES EFFECT ON BOTH TYPES OF MEMBERS
@@ -397,7 +434,7 @@ static void NavigateAelinetGuildSection(MemberType memberType)
 
     browser.Navigate(new Uri(GlobalState.BaseAelinetUri, $"/guild/{sectionName}/{GlobalState.PantheonId}"));
 
-    string.Format("{0} Processing Page {1} for {2}...", DateTime.Now.ToString(TimestampFormat), 1, memberType == MemberType.PantheonMember ? "pantheon members" : "academy members").Dump();
+    string.Format("{0} Processing Page {1} for {2}...", DateTime.Now.ToString(TimestampFormat), nextPage++, memberType == MemberType.PantheonMember ? "pantheon members" : "academy members").Dump();
 
     //Handle the landing page (1st page)
     if (skipToPage < 2)
@@ -556,9 +593,9 @@ public class GuildMember
     public int C3R { get; set; }
     public int C4 { get; set; }
     public int C4R { get; set; }
-    //unknown distortions at this time but reserving space
     public int D1 { get; set; }
     public int D1R { get; set; }
+    //unknown distortions at this time but reserving space
     public int D2 { get; set; }
     public int D2R { get; set; }
     public int D3 { get; set; }
@@ -571,13 +608,30 @@ public class GuildMember
     public int Machavann { get; set; }
     public int ThanatosTraining { get; set; }
     public int Thanatos { get; set; }
-    //Placeholder columns that I don't know the name of at this point!
     public int TolMonterTraining { get; set; }
     public int TolMonter { get; set; }
+    //Placeholder columns that I don't know the name of at this point!
     public int DemonTraining { get; set; }
     public int Demon { get; set; }
     public int AkonitaTraining { get; set; }
     public int Akonita { get; set; }
+    public int MantideTraining { get; set; }
+    public int Mantide { get; set; }
+    public TimeSpan IntegratorTrainingTimeSpent { get; set; }
+    public TimeSpan IntegratorTimeSpent { get; set; }
+    public TimeSpan MachavannTrainingTimeSpent { get; set; }
+    public TimeSpan MachavannTimeSpent { get; set; }
+    public TimeSpan ThanatosTrainingTimeSpent { get; set; }
+    public TimeSpan ThanatosTimeSpent { get; set; }
+    public TimeSpan TolMonterTrainingTimeSpent { get; set; }
+    public TimeSpan TolMonterTimeSpent { get; set; }
+    //Placeholder columns that I don't know the name of at this point!
+    public TimeSpan DemonTrainingTimeSpent { get; set; }
+    public TimeSpan DemonTimeSpent { get; set; }
+    public TimeSpan AkonitaTrainingTimeSpent { get; set; }
+    public TimeSpan AkonitaTimeSpent { get; set; }
+    public TimeSpan MantideTrainingTimeSpent { get; set; }
+    public TimeSpan MantideTimeSpent { get; set; }
     //Let the epeen competitions begin!
     public string ActiveClass { get; set; }
     public int Strength { get; set; }
@@ -651,6 +705,7 @@ public class AdventureInfo
     public AdventureType AdventureType { get; set; }
     public int CompletionCount { get; set; }
     public bool IsRated => !string.IsNullOrEmpty(Name) && Name.EndsWith("(Rated)");
+    public TimeSpan TimeSpent { get; set; }
 }
 
 public enum MemberType
